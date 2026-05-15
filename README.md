@@ -36,3 +36,7 @@ pnpm contracts:test
 ## Vision
 
 See [docs/vision.md](docs/vision.md).
+
+## App MVP
+
+See [docs/app-mvp-plan.md](docs/app-mvp-plan.md) for the local-first app plan and [docs/app-design.md](docs/app-design.md) for deferred design notes.

@@ -4,6 +4,8 @@
 
 The App MVP is functional-first. We should make the product understandable, usable, and reliable before spending serious time on visual polish.
 
+The functional plan lives in `docs/app-mvp-plan.md`.
+
 For now, design work should support these goals:
 
 - users can understand what a market is
