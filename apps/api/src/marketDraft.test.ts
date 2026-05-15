@@ -4,9 +4,11 @@ import { marketDraftResponseSchema } from "@iknow/shared";
 import { createMarketDraftResponse } from "./marketDraft.js";
 
 test("creates contract-ready market draft response", () => {
+  const closeTime = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
   const response = createMarketDraftResponse({
     question: "Will Arsenal win the English Premier League?",
-    closeTime: "2026-06-01T00:00:00.000Z",
+    closeTime,
     resolutionSource: "Official Premier League table after final matchday.",
     invalidConditions: ["Season cancelled before completion."],
   });
@@ -14,7 +16,7 @@ test("creates contract-ready market draft response", () => {
   marketDraftResponseSchema.parse(response);
 
   assert.deepEqual(response.draft.outcomes, ["YES", "NO"]);
-  assert.equal(response.factoryArgs.closeTime, 1_780_272_000);
+  assert.equal(response.factoryArgs.closeTime, Math.floor(Date.parse(closeTime) / 1000));
   assert.match(response.factoryArgs.specHash, /^0x[a-f0-9]{64}$/);
   assert.equal(response.factoryArgs.metadataURI, `urn:iknow:market:${response.factoryArgs.specHash}`);
   assert.equal(response.factoryArgs.creationBond, "100000000");
