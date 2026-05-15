@@ -26,6 +26,10 @@ export function createMarketDraftResponse(body: DraftRequest) {
     invalidConditions: Array.isArray(body.invalidConditions) ? body.invalidConditions : DEFAULT_INVALID_CONDITIONS,
     outcomes: ["YES", "NO"],
   });
+  const closeTimeSeconds = Math.floor(Date.parse(draft.closeTime) / 1000);
+  if (closeTimeSeconds <= Math.floor(Date.now() / 1000)) {
+    throw new Error("closeTime must be in the future");
+  }
 
   const specHashInput = {
     question: draft.question,
@@ -38,7 +42,7 @@ export function createMarketDraftResponse(body: DraftRequest) {
   const factoryArgs = {
     specHash,
     metadataURI: `urn:iknow:market:${specHash}`,
-    closeTime: Math.floor(Date.parse(draft.closeTime) / 1000),
+    closeTime: closeTimeSeconds,
     creationBond: DEFAULT_CREATION_BOND.toString(),
     initialLiquidity: DEFAULT_INITIAL_LIQUIDITY.toString(),
   };

@@ -22,3 +22,15 @@ test("creates contract-ready market draft response", () => {
   assert.equal(response.specHashInput.closeTime, response.draft.closeTime);
   assert.equal(response.specHashInput.resolutionSource, response.draft.resolutionSource);
 });
+
+test("rejects closeTime values the factory would reject", () => {
+  assert.throws(
+    () =>
+      createMarketDraftResponse({
+        question: "Will this stale market be rejected?",
+        closeTime: "2020-01-01T00:00:00.000Z",
+        resolutionSource: "A historical source.",
+      }),
+    /closeTime must be in the future/,
+  );
+});
