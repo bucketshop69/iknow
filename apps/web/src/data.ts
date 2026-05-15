@@ -17,6 +17,7 @@ import {
   createPublicClient,
   createWalletClient,
   encodePacked,
+  formatUnits,
   http,
   keccak256,
   maxUint256,
@@ -33,6 +34,8 @@ import type {
   CreateDraftInput,
   DevActor,
   DevActorRole,
+  LpPositionReadback,
+  MarketUserState,
   MarketReadModel,
   PortfolioReadModel,
 } from "./types";
@@ -202,14 +205,51 @@ export interface MarketDataSource {
   getMarket: (marketId: string) => MarketReadModel | undefined;
   getPortfolio: (actorId: string) => PortfolioReadModel;
   buildDraftPreview: (input: CreateDraftInput) => Promise<MarketDraftResponse>;
+  buildTradeQuote: (
+    marketId: string,
+    action: TradeAction,
+    amount: string,
+    slippageBps: number,
+  ) => Promise<TradeQuoteReadback>;
   executeCreateMarket: (actorId: string, draft: MarketDraftResponse) => Promise<MarketCreationResult>;
-  executeBuy: (actorId: string, marketId: string, side: "YES" | "NO", usdcAmount: string) => Promise<Hex>;
+  executeBuy: (
+    actorId: string,
+    marketId: string,
+    side: "YES" | "NO",
+    usdcAmount: string,
+    slippageBps?: number,
+  ) => Promise<Hex>;
+  executeSell: (
+    actorId: string,
+    marketId: string,
+    side: "YES" | "NO",
+    outcomeAmount: string,
+    slippageBps?: number,
+  ) => Promise<Hex>;
   executeAddLiquidity: (actorId: string, marketId: string, usdcAmount: string) => Promise<Hex>;
+  executeRemoveLiquidity: (actorId: string, marketId: string, lpShares: string) => Promise<Hex>;
+  readMarketUserState: (actorId: string, marketId: string) => Promise<MarketUserState>;
+  readLpPosition: (actorId: string, marketId: string) => Promise<LpPositionReadback>;
+  readLpPortfolio: (actorId: string) => Promise<PortfolioReadModel>;
 }
 
 export interface MarketCreationResult {
   hash: Hex;
   market: DeployedMarket;
+}
+
+export type TradeAction = "BUY_YES" | "BUY_NO" | "SELL_YES" | "SELL_NO";
+
+export interface TradeQuoteReadback {
+  action: TradeAction;
+  inputLabel: string;
+  outputLabel: string;
+  feeLabel: string;
+  minOutputLabel: string;
+  amountOut: string;
+  fee: string;
+  minAmountOut: string;
+  slippageBps: number;
 }
 
 export function createMarketDataSource(deployment: LocalDeployment | null, actors: DevActor[]): MarketDataSource {
@@ -252,14 +292,28 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
       };
     },
     buildDraftPreview,
+    buildTradeQuote: (marketId, action, amount, slippageBps) =>
+      buildTradeQuote(deployment, marketId, action, amount, slippageBps),
     executeCreateMarket: (actorId, draft) => executeCreateMarket(deployment, actorId, draft),
-    executeBuy: (actorId, marketId, side, usdcAmount) => executeBuy(deployment, actorId, marketId, side, usdcAmount),
+    executeBuy: (actorId, marketId, side, usdcAmount, slippageBps) =>
+      executeBuy(deployment, actorId, marketId, side, usdcAmount, slippageBps),
+    executeSell: (actorId, marketId, side, outcomeAmount, slippageBps) =>
+      executeSell(deployment, actorId, marketId, side, outcomeAmount, slippageBps),
     executeAddLiquidity: (actorId, marketId, usdcAmount) =>
       executeAddLiquidity(deployment, actorId, marketId, usdcAmount),
+    executeRemoveLiquidity: (actorId, marketId, lpShares) =>
+      executeRemoveLiquidity(deployment, actorId, marketId, lpShares),
+    readMarketUserState: (actorId, marketId) => readMarketUserState(deployment, actors, markets, actorId, marketId),
+    readLpPosition: (actorId, marketId) => readLpPosition(deployment, actors, markets, actorId, marketId),
+    readLpPortfolio: (actorId) => readLpPortfolio(deployment, actors, markets, actorId),
   };
 }
 
 const erc20Abi = parseAbi(["function approve(address spender,uint256 value) returns (bool)"]);
+const outcomeApprovalAbi = parseAbi([
+  "function isApprovedForAll(address account,address operator) view returns (bool)",
+  "function setApprovalForAll(address operator,bool approved)",
+]);
 
 function requireDeployment(deployment: LocalDeployment | null): LocalDeployment {
   if (!deployment) {
@@ -323,6 +377,303 @@ async function approveUsdc(deployment: LocalDeployment, actorId: string, spender
   await waitForSuccess(deployment, hash);
 }
 
+async function approveOutcomeSpender(deployment: LocalDeployment, actorId: string, spender: Address) {
+  const { publicClient, walletClient } = clients(deployment, actorId);
+  const account = actorAccount(deployment, actorId);
+  const approved = await publicClient.readContract({
+    address: deployment.contracts.outcomeToken.address as Address,
+    abi: outcomeApprovalAbi,
+    functionName: "isApprovedForAll",
+    args: [account.address, spender],
+  });
+
+  if (approved) {
+    return;
+  }
+
+  const hash = await walletClient.writeContract({
+    address: deployment.contracts.outcomeToken.address as Address,
+    abi: outcomeApprovalAbi,
+    functionName: "setApprovalForAll",
+    args: [spender, true],
+  });
+  await waitForSuccess(deployment, hash);
+}
+
+function parseTradeAmount(deployment: LocalDeployment, amount: string) {
+  const parsed = parseUnits(amount || "0", deployment.contracts.mockUSDC.decimals);
+  if (parsed <= 0n) {
+    throw new Error("Amount must be greater than zero");
+  }
+
+  return parsed;
+}
+
+function boundedSlippageBps(slippageBps = 100) {
+  if (!Number.isFinite(slippageBps)) {
+    return 100;
+  }
+
+  return Math.min(5_000, Math.max(0, Math.round(slippageBps)));
+}
+
+function minOutForSlippage(amountOut: bigint, slippageBps?: number) {
+  return (amountOut * BigInt(10_000 - boundedSlippageBps(slippageBps))) / 10_000n;
+}
+
+function tokenAmountLabel(deployment: LocalDeployment, amount: bigint, symbol: string) {
+  return `${displayUnits(amount, deployment.contracts.mockUSDC.decimals)} ${symbol}`;
+}
+
+async function quoteTrade(
+  deployment: LocalDeployment,
+  marketId: string,
+  action: TradeAction,
+  amount: bigint,
+  slippageBps = 100,
+) {
+  const market = findMarket(deployment, marketId);
+  const { publicClient } = clients(deployment, "deployer");
+  const marketAddress = market.address as Address;
+  const [amountOut, fee] =
+    action === "BUY_YES"
+      ? await publicClient.readContract({
+          address: marketAddress,
+          abi: iknowMarketAbi,
+          functionName: "quoteBuyYes",
+          args: [amount],
+        })
+      : action === "BUY_NO"
+        ? await publicClient.readContract({
+            address: marketAddress,
+            abi: iknowMarketAbi,
+            functionName: "quoteBuyNo",
+            args: [amount],
+          })
+        : action === "SELL_YES"
+          ? await publicClient.readContract({
+              address: marketAddress,
+              abi: iknowMarketAbi,
+              functionName: "quoteSellYes",
+              args: [amount],
+            })
+          : await publicClient.readContract({
+              address: marketAddress,
+              abi: iknowMarketAbi,
+              functionName: "quoteSellNo",
+              args: [amount],
+            });
+
+  return {
+    amountOut,
+    fee,
+    minAmountOut: minOutForSlippage(amountOut, slippageBps),
+    slippageBps: boundedSlippageBps(slippageBps),
+  };
+}
+
+async function buildTradeQuote(
+  maybeDeployment: LocalDeployment | null,
+  marketId: string,
+  action: TradeAction,
+  rawAmount: string,
+  slippageBps: number,
+): Promise<TradeQuoteReadback> {
+  const deployment = requireDeployment(maybeDeployment);
+  const amount = parseTradeAmount(deployment, rawAmount);
+  const quote = await quoteTrade(deployment, marketId, action, amount, slippageBps);
+  const isBuy = action === "BUY_YES" || action === "BUY_NO";
+  const side = action.endsWith("YES") ? "YES" : "NO";
+
+  return {
+    action,
+    inputLabel: isBuy ? tokenAmountLabel(deployment, amount, "USDC") : tokenAmountLabel(deployment, amount, side),
+    outputLabel: isBuy
+      ? tokenAmountLabel(deployment, quote.amountOut, side)
+      : tokenAmountLabel(deployment, quote.amountOut, "USDC"),
+    feeLabel: tokenAmountLabel(deployment, quote.fee, "USDC"),
+    minOutputLabel: isBuy
+      ? tokenAmountLabel(deployment, quote.minAmountOut, side)
+      : tokenAmountLabel(deployment, quote.minAmountOut, "USDC"),
+    amountOut: quote.amountOut.toString(),
+    fee: quote.fee.toString(),
+    minAmountOut: quote.minAmountOut.toString(),
+    slippageBps: quote.slippageBps,
+  };
+}
+
+function displayUnits(value: bigint, decimals: number) {
+  const formatted = formatUnits(value, decimals);
+  if (!formatted.includes(".")) {
+    return Number(formatted).toLocaleString();
+  }
+
+  const [whole, fraction] = formatted.split(".");
+  const trimmedFraction = fraction.replace(/0+$/g, "");
+  const localizedWhole = Number(whole).toLocaleString();
+
+  return trimmedFraction ? `${localizedWhole}.${trimmedFraction}` : localizedWhole;
+}
+
+function findMarket(deployment: LocalDeployment, marketId: string) {
+  const market = deployment.markets.find((candidate) => candidate.id === marketId);
+  if (!market) {
+    throw new Error(`Unknown market: ${marketId}`);
+  }
+
+  return market;
+}
+
+async function readLpPosition(
+  maybeDeployment: LocalDeployment | null,
+  actors: DevActor[],
+  markets: MarketReadModel[],
+  actorId: string,
+  marketId: string,
+): Promise<LpPositionReadback> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const readModel = markets.find((candidate) => candidate.id === marketId);
+  const actor = actors.find((candidate) => candidate.id === actorId);
+  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const marketAddress = market.address as Address;
+  const decimals = deployment.contracts.mockUSDC.decimals;
+  const { publicClient } = clients(deployment, actorId);
+
+  const [shares, pending, totalShares, accLpFeePerShare, lpFeeDebt, lpFeePrecision] = await Promise.all([
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "lpShares",
+      args: [actorAddress],
+    }),
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "pendingLpFees",
+      args: [actorAddress],
+    }),
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "totalLpShares",
+    }),
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "accLpFeePerShare",
+    }),
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "lpFeeDebt",
+      args: [actorAddress],
+    }),
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "LP_FEE_ACC_PRECISION",
+    }),
+  ]);
+  const accrued = (shares * accLpFeePerShare) / lpFeePrecision;
+  const checkpointable = accrued > lpFeeDebt ? accrued - lpFeeDebt : 0n;
+  const pendingFees = pending + checkpointable;
+
+  return {
+    marketId,
+    marketQuestion: readModel?.question ?? market.question,
+    lpShares: `${displayUnits(shares, decimals)} LP`,
+    pendingFees: `${displayUnits(pendingFees, decimals)} USDC`,
+    totalLpShares: `${displayUnits(totalShares, decimals)} LP`,
+    lpSharesRaw: shares.toString(),
+    pendingFeesRaw: pendingFees.toString(),
+  };
+}
+
+async function readMarketUserState(
+  maybeDeployment: LocalDeployment | null,
+  actors: DevActor[],
+  markets: MarketReadModel[],
+  actorId: string,
+  marketId: string,
+): Promise<MarketUserState> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const actor = actors.find((candidate) => candidate.id === actorId);
+  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const marketAddress = market.address as Address;
+  const decimals = deployment.contracts.mockUSDC.decimals;
+  const { publicClient } = clients(deployment, actorId);
+
+  const [reserves, yesBalance, noBalance, lpPosition] = await Promise.all([
+    publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "reserves",
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.outcomeToken.address as Address,
+      abi: outcomeTokenAbi,
+      functionName: "balanceOf",
+      args: [actorAddress, BigInt(market.yesTokenId)],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.outcomeToken.address as Address,
+      abi: outcomeTokenAbi,
+      functionName: "balanceOf",
+      args: [actorAddress, BigInt(market.noTokenId)],
+    }),
+    readLpPosition(maybeDeployment, actors, markets, actorId, marketId),
+  ]);
+  const [yesReserve, noReserve] = reserves;
+
+  return {
+    yesReserve: `${displayUnits(yesReserve, decimals)} YES`,
+    noReserve: `${displayUnits(noReserve, decimals)} NO`,
+    yesBalance: `${displayUnits(yesBalance, decimals)} YES`,
+    noBalance: `${displayUnits(noBalance, decimals)} NO`,
+    lpShares: lpPosition.lpShares,
+    pendingLpFees: lpPosition.pendingFees,
+    totalLpShares: lpPosition.totalLpShares,
+  };
+}
+
+async function readLpPortfolio(
+  maybeDeployment: LocalDeployment | null,
+  actors: DevActor[],
+  markets: MarketReadModel[],
+  actorId: string,
+): Promise<PortfolioReadModel> {
+  const deployment = requireDeployment(maybeDeployment);
+  const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
+  const readbacks = await Promise.all(
+    markets.map((market) => readLpPosition(deployment, actors, markets, actorId, market.id)),
+  );
+  const activeReadbacks = readbacks.filter(
+    (position) => BigInt(position.lpSharesRaw) > 0n || BigInt(position.pendingFeesRaw) > 0n,
+  );
+  const positions = activeReadbacks.map((position) => ({
+    marketId: position.marketId,
+    marketQuestion: position.marketQuestion,
+    yesShares: "0",
+    noShares: "0",
+    lpShares: position.lpShares,
+    claimable: position.pendingFees,
+  }));
+  const claimable = activeReadbacks.reduce((total, position) => total + BigInt(position.pendingFeesRaw), 0n);
+
+  return {
+    actor,
+    positions,
+    totals: {
+      yesMarkets: positions.filter((position) => position.yesShares !== "0").length,
+      noMarkets: positions.filter((position) => position.noShares !== "0").length,
+      lpMarkets: positions.filter((position) => position.lpShares !== "0 LP").length,
+      claimable: `${displayUnits(claimable, deployment.contracts.mockUSDC.decimals)} USDC`,
+    },
+  };
+}
+
 async function executeCreateMarket(
   maybeDeployment: LocalDeployment | null,
   actorId: string,
@@ -384,16 +735,12 @@ async function executeBuy(
   marketId: string,
   side: "YES" | "NO",
   usdcAmount: string,
+  slippageBps = 100,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
-  const market = deployment.markets.find((candidate) => candidate.id === marketId);
-  if (!market) {
-    throw new Error(`Unknown market: ${marketId}`);
-  }
-  const amount = parseUnits(usdcAmount || "0", deployment.contracts.mockUSDC.decimals);
-  if (amount <= 0n) {
-    throw new Error("Amount must be greater than zero");
-  }
+  const market = findMarket(deployment, marketId);
+  const amount = parseTradeAmount(deployment, usdcAmount);
+  const quote = await quoteTrade(deployment, marketId, side === "YES" ? "BUY_YES" : "BUY_NO", amount, slippageBps);
   const marketAddress = market.address as Address;
   const { walletClient } = clients(deployment, actorId);
 
@@ -403,7 +750,35 @@ async function executeBuy(
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: side === "YES" ? "buyYes" : "buyNo",
-    args: [amount, 0n],
+    args: [amount, quote.minAmountOut],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeSell(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+  side: "YES" | "NO",
+  outcomeAmount: string,
+  slippageBps = 100,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const amount = parseTradeAmount(deployment, outcomeAmount);
+  const quote = await quoteTrade(deployment, marketId, side === "YES" ? "SELL_YES" : "SELL_NO", amount, slippageBps);
+  const marketAddress = market.address as Address;
+  const { walletClient } = clients(deployment, actorId);
+
+  await approveOutcomeSpender(deployment, actorId, marketAddress);
+
+  const hash = await walletClient.writeContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: side === "YES" ? "sellYes" : "sellNo",
+    args: [amount, quote.minAmountOut],
   });
 
   await waitForSuccess(deployment, hash);
@@ -417,14 +792,8 @@ async function executeAddLiquidity(
   usdcAmount: string,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
-  const market = deployment.markets.find((candidate) => candidate.id === marketId);
-  if (!market) {
-    throw new Error(`Unknown market: ${marketId}`);
-  }
-  const amount = parseUnits(usdcAmount || "0", deployment.contracts.mockUSDC.decimals);
-  if (amount <= 0n) {
-    throw new Error("Amount must be greater than zero");
-  }
+  const market = findMarket(deployment, marketId);
+  const amount = parseTradeAmount(deployment, usdcAmount);
   const marketAddress = market.address as Address;
   const { walletClient } = clients(deployment, actorId);
 
@@ -435,6 +804,32 @@ async function executeAddLiquidity(
     abi: iknowMarketAbi,
     functionName: "addLiquidity",
     args: [amount, 0n],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeRemoveLiquidity(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+  lpShares: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const shares = parseUnits(lpShares || "0", deployment.contracts.mockUSDC.decimals);
+  if (shares <= 0n) {
+    throw new Error("LP shares must be greater than zero");
+  }
+  const marketAddress = market.address as Address;
+  const { walletClient } = clients(deployment, actorId);
+
+  const hash = await walletClient.writeContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: "removeLiquidity",
+    args: [shares, 0n, 0n],
   });
 
   await waitForSuccess(deployment, hash);

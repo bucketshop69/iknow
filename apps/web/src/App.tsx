@@ -7,11 +7,15 @@ import {
   createMarketDataSource,
   devActorsFromDeployment,
   loadLocalDeployment,
+  type TradeAction,
+  type TradeQuoteReadback,
 } from "./data";
 import type {
   CreateDraftInput,
   DevActor,
+  MarketUserState,
   MarketReadModel,
+  PortfolioReadModel,
   Route,
 } from "./types";
 
@@ -77,6 +81,7 @@ function App() {
   const dataSource = useMemo(() => createMarketDataSource(deployment, actors), [deployment, actors]);
   const markets = dataSource.listMarkets();
   const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
+  const [chainRefreshKey, setChainRefreshKey] = useState(0);
 
   const refreshDeployment = async () => {
     setDeploymentState("loading");
@@ -87,6 +92,11 @@ function App() {
     } catch {
       setDeploymentState("fallback");
     }
+  };
+
+  const refreshChainReadbacks = () => {
+    setChainRefreshKey((current) => current + 1);
+    void refreshDeployment();
   };
 
   useEffect(() => {
@@ -166,7 +176,7 @@ function App() {
         </nav>
         <WalletPanel actor={actor} actorId={actorId} actors={actors} onActorChange={setActorId} />
         <WalletConnectionPanel />
-        <RuntimePanel surface={surface} state={deploymentState} onRefresh={() => void refreshDeployment()} />
+        <RuntimePanel surface={surface} state={deploymentState} onRefresh={refreshChainReadbacks} />
       </aside>
 
       <main className="workspace">
@@ -178,6 +188,8 @@ function App() {
             market={dataSource.getMarket(route.marketId)}
             actorId={actorId}
             dataSource={dataSource}
+            refreshKey={chainRefreshKey}
+            onTransactionConfirmed={refreshChainReadbacks}
             onBack={() => navigate({ screen: "markets" })}
           />
         )}
@@ -188,6 +200,7 @@ function App() {
           <PortfolioScreen
             actorId={actorId}
             dataSource={dataSource}
+            refreshKey={chainRefreshKey}
             onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
           />
         )}
@@ -371,11 +384,15 @@ function MarketDetailScreen({
   market,
   actorId,
   dataSource,
+  refreshKey,
+  onTransactionConfirmed,
   onBack,
 }: {
   market?: MarketReadModel;
   actorId: string;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  refreshKey: number;
+  onTransactionConfirmed: () => void;
   onBack: () => void;
 }) {
   if (!market) {
@@ -443,7 +460,13 @@ function MarketDetailScreen({
           </ul>
         </article>
 
-        <MarketActionPanel actorId={actorId} market={market} dataSource={dataSource} />
+        <MarketActionPanel
+          actorId={actorId}
+          market={market}
+          dataSource={dataSource}
+          refreshKey={refreshKey}
+          onTransactionConfirmed={onTransactionConfirmed}
+        />
       </section>
     </>
   );
@@ -453,39 +476,222 @@ function MarketActionPanel({
   actorId,
   market,
   dataSource,
+  refreshKey,
+  onTransactionConfirmed,
 }: {
   actorId: string;
   market: MarketReadModel;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  refreshKey: number;
+  onTransactionConfirmed: () => void;
 }) {
   const [tradeAmount, setTradeAmount] = useState("25");
+  const [tradeAction, setTradeAction] = useState<TradeAction>("BUY_YES");
+  const [slippageBps, setSlippageBps] = useState(100);
+  const [tradeQuote, setTradeQuote] = useState<TradeQuoteReadback | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<string | null>(null);
   const [liquidityAmount, setLiquidityAmount] = useState("100");
+  const [removeShares, setRemoveShares] = useState("100");
   const [status, setStatus] = useState<string | null>(null);
+  const [userState, setUserState] = useState<MarketUserState | null>(null);
+  const [readbackStatus, setReadbackStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setReadbackStatus("Refreshing position...");
+    dataSource
+      .readMarketUserState(actorId, market.id)
+      .then((nextUserState) => {
+        if (cancelled) {
+          return;
+        }
+        setUserState(nextUserState);
+        setReadbackStatus(null);
+      })
+      .catch((caught) => {
+        if (cancelled) {
+          return;
+        }
+        setUserState(null);
+        setReadbackStatus(caught instanceof Error ? caught.message : "Position readback unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorId, dataSource, market.id, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setTradeQuote(null);
+    if (!tradeAmount.trim()) {
+      setQuoteStatus(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setQuoteStatus("Refreshing quote...");
+    dataSource
+      .buildTradeQuote(market.id, tradeAction, tradeAmount, slippageBps)
+      .then((quote) => {
+        if (cancelled) {
+          return;
+        }
+        setTradeQuote(quote);
+        setQuoteStatus(null);
+      })
+      .catch((caught) => {
+        if (cancelled) {
+          return;
+        }
+        setTradeQuote(null);
+        setQuoteStatus(caught instanceof Error ? caught.message : "Quote unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, market.id, refreshKey, slippageBps, tradeAction, tradeAmount]);
 
   const runAction = async (label: string, action: () => Promise<string>) => {
     setStatus(`${label} pending...`);
     try {
       const hash = await action();
       setStatus(`${label} confirmed: ${shortAddress(hash)}`);
+      onTransactionConfirmed();
     } catch (caught) {
       setStatus(caught instanceof Error ? caught.message : `${label} failed`);
     }
   };
 
+  const isErrorStatus = (message: string) =>
+    ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert"].some((token) =>
+      message.toLowerCase().includes(token),
+    );
+
+  const tradeLabel = (action: TradeAction) => {
+    if (action === "BUY_YES") {
+      return "Buy YES";
+    }
+    if (action === "BUY_NO") {
+      return "Buy NO";
+    }
+    if (action === "SELL_YES") {
+      return "Sell YES";
+    }
+    return "Sell NO";
+  };
+
+  const updateSlippage = (value: string) => {
+    const nextPercent = Number(value);
+    if (Number.isFinite(nextPercent)) {
+      setSlippageBps(Math.max(0, Math.min(50, nextPercent)) * 100);
+    }
+  };
+
+  const runTrade = (action: TradeAction) => {
+    const side = action.endsWith("YES") ? "YES" : "NO";
+    setTradeAction(action);
+
+    return runAction(
+      tradeLabel(action),
+      () =>
+        action.startsWith("BUY")
+          ? dataSource.executeBuy(actorId, market.id, side, tradeAmount, slippageBps)
+          : dataSource.executeSell(actorId, market.id, side, tradeAmount, slippageBps),
+    );
+  };
+
   return (
     <article className="wide-card">
       <h2>Local actions</h2>
+      <dl className="compact-list">
+        <div>
+          <dt>Your YES</dt>
+          <dd>{userState?.yesBalance ?? (readbackStatus ? "Unavailable" : "0 YES")}</dd>
+        </div>
+        <div>
+          <dt>Your NO</dt>
+          <dd>{userState?.noBalance ?? (readbackStatus ? "Unavailable" : "0 NO")}</dd>
+        </div>
+        <div>
+          <dt>Your LP shares</dt>
+          <dd>{userState?.lpShares ?? (readbackStatus ? "Unavailable" : "0 LP")}</dd>
+        </div>
+        <div>
+          <dt>Pending LP fees</dt>
+          <dd>{userState?.pendingLpFees ?? (readbackStatus ? "Unavailable" : "0 USDC")}</dd>
+        </div>
+        <div>
+          <dt>Total LP shares</dt>
+          <dd>{userState?.totalLpShares ?? (readbackStatus ? "Unavailable" : "0 LP")}</dd>
+        </div>
+        <div>
+          <dt>Live reserves</dt>
+          <dd>{userState ? `${userState.yesReserve} / ${userState.noReserve}` : readbackStatus ? "Unavailable" : "0 / 0"}</dd>
+        </div>
+      </dl>
+      {readbackStatus && !userState && (
+        <p className={readbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{readbackStatus}</p>
+      )}
       <div className="action-grid">
         <label>
           Trade amount
           <input inputMode="decimal" value={tradeAmount} onChange={(event) => setTradeAmount(event.target.value)} />
         </label>
+        <label>
+          Quote
+          <select value={tradeAction} onChange={(event) => setTradeAction(event.target.value as TradeAction)}>
+            <option value="BUY_YES">Buy YES</option>
+            <option value="BUY_NO">Buy NO</option>
+            <option value="SELL_YES">Sell YES</option>
+            <option value="SELL_NO">Sell NO</option>
+          </select>
+        </label>
+        <label>
+          Slippage %
+          <input
+            inputMode="decimal"
+            value={String(slippageBps / 100)}
+            onChange={(event) => updateSlippage(event.target.value)}
+          />
+        </label>
+        <dl className="compact-list">
+          <div>
+            <dt>Input</dt>
+            <dd>{tradeQuote?.inputLabel ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>Expected out</dt>
+            <dd>{tradeQuote?.outputLabel ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>Fee</dt>
+            <dd>{tradeQuote?.feeLabel ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>Min out</dt>
+            <dd>{tradeQuote?.minOutputLabel ?? "-"}</dd>
+          </div>
+        </dl>
+        {quoteStatus && (
+          <p className={quoteStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{quoteStatus}</p>
+        )}
         <div className="button-row">
-          <button onClick={() => runAction("Buy YES", () => dataSource.executeBuy(actorId, market.id, "YES", tradeAmount))}>
+          <button onClick={() => runTrade("BUY_YES")}>
             Buy YES
           </button>
-          <button onClick={() => runAction("Buy NO", () => dataSource.executeBuy(actorId, market.id, "NO", tradeAmount))}>
+          <button onClick={() => runTrade("BUY_NO")}>
             Buy NO
+          </button>
+          <button onClick={() => runTrade("SELL_YES")}>
+            Sell YES
+          </button>
+          <button onClick={() => runTrade("SELL_NO")}>
+            Sell NO
           </button>
         </div>
         <label>
@@ -502,8 +708,20 @@ function MarketActionPanel({
         >
           Add liquidity
         </button>
+        <label>
+          Remove LP shares
+          <input inputMode="decimal" value={removeShares} onChange={(event) => setRemoveShares(event.target.value)} />
+        </label>
+        <button
+          className="secondary"
+          onClick={() =>
+            runAction("Remove liquidity", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
+          }
+        >
+          Remove liquidity
+        </button>
       </div>
-      {status && <p className={status.includes("failed") || status.includes("must") ? "error-text" : "status-text"}>{status}</p>}
+      {status && <p className={isErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
     </article>
   );
 }
@@ -688,13 +906,51 @@ function DraftPreview({
 function PortfolioScreen({
   actorId,
   dataSource,
+  refreshKey,
   onOpenMarket,
 }: {
   actorId: string;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  refreshKey: number;
   onOpenMarket: (marketId: string) => void;
 }) {
-  const portfolio = dataSource.getPortfolio(actorId);
+  const staticPortfolio = dataSource.getPortfolio(actorId);
+  const [livePortfolio, setLivePortfolio] = useState<PortfolioReadModel | null>(null);
+  const [lpReadbackStatus, setLpReadbackStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setLivePortfolio(null);
+    setLpReadbackStatus("Refreshing LP positions...");
+    dataSource
+      .readLpPortfolio(actorId)
+      .then((portfolio) => {
+        if (cancelled) {
+          return;
+        }
+        setLivePortfolio(portfolio);
+        setLpReadbackStatus(null);
+      })
+      .catch((caught) => {
+        if (cancelled) {
+          return;
+        }
+        setLpReadbackStatus(caught instanceof Error ? caught.message : "LP portfolio readback unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorId, dataSource, refreshKey]);
+
+  const shouldUseLivePortfolio = Boolean(
+    livePortfolio &&
+    (livePortfolio.positions.length > 0 ||
+      staticPortfolio.actor.role === "LiquidityProvider" ||
+      staticPortfolio.positions.some((position) => position.lpShares !== "0")),
+  );
+  const portfolio = shouldUseLivePortfolio && livePortfolio ? livePortfolio : staticPortfolio;
 
   return (
     <>
@@ -712,6 +968,9 @@ function PortfolioScreen({
         <Metric label="LP markets" value={String(portfolio.totals.lpMarkets)} />
         <Metric label="Claimable" value={portfolio.totals.claimable} />
       </section>
+      {lpReadbackStatus && !livePortfolio && (
+        <p className={lpReadbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{lpReadbackStatus}</p>
+      )}
 
       <section className="market-table" aria-label="Portfolio positions">
         <div className="market-row portfolio-row table-head">

@@ -64,6 +64,16 @@ export interface MarketReadModel {
   volume24h: string;
 }
 
+export interface MarketUserState {
+  yesReserve: string;
+  noReserve: string;
+  yesBalance: string;
+  noBalance: string;
+  lpShares: string;
+  pendingLpFees: string;
+  totalLpShares: string;
+}
+
 export interface PortfolioPosition {
   marketId: string;
   marketQuestion: string;
@@ -71,6 +81,16 @@ export interface PortfolioPosition {
   noShares: string;
   lpShares: string;
   claimable: string;
+}
+
+export interface LpPositionReadback {
+  marketId: string;
+  marketQuestion: string;
+  lpShares: string;
+  pendingFees: string;
+  totalLpShares: string;
+  lpSharesRaw: string;
+  pendingFeesRaw: string;
 }
 
 export interface PortfolioReadModel {
