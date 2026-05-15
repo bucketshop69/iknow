@@ -42,6 +42,7 @@ contract IknowMarket {
     uint256 public constant LP_FEE_BPS = 20;
     uint256 public constant CREATOR_FEE_BPS = 5;
     uint256 public constant PROTOCOL_FEE_BPS = 5;
+    uint256 public constant LP_FEE_ACC_PRECISION = 1e18;
     bytes4 private constant ERC1155_ACCEPTED = 0xf23a6e61;
     bytes4 private constant ERC1155_BATCH_ACCEPTED = 0xbc197c81;
     bytes4 private constant ERC165_INTERFACE_ID = 0x01ffc9a7;
@@ -75,10 +76,13 @@ contract IknowMarket {
     uint256 public lpFeePool;
     uint256 public creatorFeePool;
     uint256 public protocolFeePool;
+    uint256 public accLpFeePerShare;
     uint256 public creationBond;
     uint256 public totalLpShares;
 
     mapping(address => uint256) public lpShares;
+    mapping(address => uint256) public lpFeeDebt;
+    mapping(address => uint256) public pendingLpFees;
 
     bool private locked;
 
@@ -112,6 +116,8 @@ contract IknowMarket {
     event CreatorFeesClaimed(address indexed recipient, uint256 amount);
     event ProtocolFeesClaimed(address indexed recipient, uint256 amount);
     event CreatorFeesForfeited(uint256 amount);
+    event CreationBondClaimed(address indexed recipient, uint256 amount);
+    event CreationBondSlashed(uint256 amount);
 
     error NotFactory();
     error NotResolver();
@@ -207,6 +213,7 @@ contract IknowMarket {
         noReserve = initialLiquidity;
         totalLpShares = initialLiquidity;
         lpShares[creator] = initialLiquidity;
+        lpFeeDebt[creator] = initialLiquidity * accLpFeePerShare / LP_FEE_ACC_PRECISION;
 
         emit LiquidityAdded(creator, initialLiquidity, initialLiquidity, initialLiquidity, initialLiquidity);
     }
@@ -376,6 +383,8 @@ contract IknowMarket {
         }
         if (shares < minShares) revert Slippage();
 
+        _checkpointLpFees(msg.sender);
+
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
         collateralBalance += usdcAmount;
         outcomeToken.mintCompleteSet(address(this), address(this), usdcAmount, "");
@@ -384,6 +393,7 @@ contract IknowMarket {
         noReserve += noUsed;
         totalLpShares += shares;
         lpShares[msg.sender] += shares;
+        _setLpFeeDebt(msg.sender);
 
         uint256 yesLeft = usdcAmount - yesUsed;
         uint256 noLeft = usdcAmount - noUsed;
@@ -414,11 +424,14 @@ contract IknowMarket {
         noOut = shares * noReserve / totalLpShares;
         if (yesOut < minYesOut || noOut < minNoOut) revert Slippage();
 
-        uint256 lpFeeOut = shares == totalLpShares ? lpFeePool : lpFeePool * shares / totalLpShares;
+        _checkpointLpFees(msg.sender);
+        uint256 lpFeeOut = pendingLpFees[msg.sender];
+        pendingLpFees[msg.sender] = 0;
 
         lpShares[msg.sender] -= shares;
         totalLpShares -= shares;
         lpFeePool -= lpFeeOut;
+        _setLpFeeDebt(msg.sender);
         yesReserve -= yesOut;
         noReserve -= noOut;
 
@@ -434,7 +447,7 @@ contract IknowMarket {
 
     function close() external {
         if (state != State.Open) revert InvalidState();
-        if (block.timestamp < closeTime && msg.sender != resolver) revert TooEarly();
+        if (block.timestamp < closeTime) revert TooEarly();
         state = State.Closed;
         emit MarketClosed(block.timestamp);
     }
@@ -465,8 +478,14 @@ contract IknowMarket {
         if (finalOutcome == Outcome.Invalid && creatorFeePool != 0) {
             uint256 forfeited = creatorFeePool;
             creatorFeePool = 0;
-            lpFeePool += forfeited;
+            _accrueLpFees(forfeited);
             emit CreatorFeesForfeited(forfeited);
+        }
+        if (finalOutcome == Outcome.Invalid && creationBond != 0) {
+            uint256 slashed = creationBond;
+            creationBond = 0;
+            _accrueLpFees(slashed);
+            emit CreationBondSlashed(slashed);
         }
 
         emit MarketResolved(finalOutcome);
@@ -534,6 +553,20 @@ contract IknowMarket {
         emit ProtocolFeesClaimed(recipient, amount);
     }
 
+    function claimCreationBond(address recipient) external nonReentrant {
+        if (msg.sender != creator) revert NotCreator();
+        if (recipient == address(0)) revert ZeroAddress();
+        if (state != State.Resolved) revert InvalidState();
+        if (finalOutcome == Outcome.Invalid) revert InvalidOutcome();
+        uint256 amount = creationBond;
+        if (amount == 0) revert InvalidAmount();
+
+        creationBond = 0;
+        usdc.safeTransfer(recipient, amount);
+
+        emit CreationBondClaimed(recipient, amount);
+    }
+
     function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
         return ERC1155_ACCEPTED;
     }
@@ -594,11 +627,35 @@ contract IknowMarket {
         uint256 protocolFee = fee * PROTOCOL_FEE_BPS / TOTAL_FEE_BPS;
         uint256 lpFee = fee - creatorFee - protocolFee;
 
-        lpFeePool += lpFee;
+        _accrueLpFees(lpFee);
         creatorFeePool += creatorFee;
         protocolFeePool += protocolFee;
 
         emit FeesAccrued(lpFee, creatorFee, protocolFee);
+    }
+
+    function _accrueLpFees(uint256 amount) private {
+        if (amount == 0) return;
+        if (totalLpShares == 0) {
+            protocolFeePool += amount;
+            return;
+        }
+        lpFeePool += amount;
+        accLpFeePerShare += amount * LP_FEE_ACC_PRECISION / totalLpShares;
+    }
+
+    function _checkpointLpFees(address account) private {
+        uint256 shares = lpShares[account];
+        uint256 accumulated = shares * accLpFeePerShare / LP_FEE_ACC_PRECISION;
+        uint256 debt = lpFeeDebt[account];
+        if (accumulated > debt) {
+            pendingLpFees[account] += accumulated - debt;
+        }
+        lpFeeDebt[account] = accumulated;
+    }
+
+    function _setLpFeeDebt(address account) private {
+        lpFeeDebt[account] = lpShares[account] * accLpFeePerShare / LP_FEE_ACC_PRECISION;
     }
 
     function _quoteBuy(uint256 usdcIn, uint256 buyReserve, uint256 otherReserve)

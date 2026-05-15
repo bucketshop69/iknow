@@ -160,23 +160,17 @@ contract OutcomeToken {
         _checkBatchReceiver(msg.sender, from, to, ids, amounts, data);
     }
 
-    function mint(address to, uint256 id, uint256 amount) public onlyMinter {
+    function _mint(address to, uint256 id, uint256 amount) private {
         if (to == address(0)) revert InvalidAddress();
         balances[id][to] += amount;
         emit TransferSingle(msg.sender, address(0), to, id, amount);
     }
 
-    function mint(address to, address market, uint8 outcome, uint256 amount, bytes calldata data) external onlyMinter {
-        uint256 id = tokenId(market, outcome);
-        mint(to, id, amount);
-        _checkReceiver(msg.sender, address(0), to, id, amount, data);
-    }
-
     function mintCompleteSet(address to, address market, uint256 amount, bytes calldata data) external onlyMinter {
         uint256 yesId = tokenId(market, OUTCOME_YES);
         uint256 noId = tokenId(market, OUTCOME_NO);
-        mint(to, yesId, amount);
-        mint(to, noId, amount);
+        _mint(to, yesId, amount);
+        _mint(to, noId, amount);
         _checkReceiver(msg.sender, address(0), to, yesId, amount, data);
         _checkReceiver(msg.sender, address(0), to, noId, amount, data);
     }

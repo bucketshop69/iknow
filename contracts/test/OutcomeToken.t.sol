@@ -14,10 +14,6 @@ contract OutcomeTokenActor {
         _token.setMinter(minter, authorized);
     }
 
-    function mint(address to, address market, uint8 outcome, uint256 amount) external {
-        _token.mint(to, market, outcome, amount, "");
-    }
-
     function mintCompleteSet(address to, address market, uint256 amount) external {
         _token.mintCompleteSet(to, market, amount, "");
     }
@@ -78,19 +74,21 @@ contract OutcomeTokenTest {
         require(reverted, "non-owner should not authorize minters");
     }
 
-    function testOnlyAuthorizedMinterCanMintAndBurn() public {
+    function testOnlyAuthorizedMinterCanMintCompleteSetAndBurn() public {
         uint256 yesId = _token.tokenId(_MARKET_A, _token.OUTCOME_YES());
+        uint256 noId = _token.tokenId(_MARKET_A, _token.OUTCOME_NO());
 
         bool mintReverted;
-        try _unauthorizedActor.mint(_TRADER, _MARKET_A, _token.OUTCOME_YES(), 1) {}
+        try _unauthorizedActor.mintCompleteSet(_TRADER, _MARKET_A, 1) {}
         catch {
             mintReverted = true;
         }
 
         require(mintReverted, "unauthorized mint should revert");
 
-        _authorizedMinter.mint(_TRADER, _MARKET_A, _token.OUTCOME_YES(), 10);
-        require(_token.balanceOf(_TRADER, yesId) == 10, "authorized mint failed");
+        _authorizedMinter.mintCompleteSet(_TRADER, _MARKET_A, 10);
+        require(_token.balanceOf(_TRADER, yesId) == 10, "authorized YES mint failed");
+        require(_token.balanceOf(_TRADER, noId) == 10, "authorized NO mint failed");
 
         bool burnReverted;
         try _unauthorizedActor.burn(_TRADER, _MARKET_A, _token.OUTCOME_YES(), 1) {}

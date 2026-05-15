@@ -44,6 +44,7 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         uint256 yesBought = market.buyYes(DEFAULT_TRADE_AMOUNT, 0);
         require(yesBought > 0, "expected YES buy");
 
+        vm.warp(closeTime);
         vm.prank(resolver);
         market.close();
 
@@ -62,6 +63,12 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         vm.prank(lp);
         vm.expectRevert(IknowMarket.InvalidState.selector);
         market.addLiquidity(ONE_USDC, 0);
+    }
+
+    function testResolverCannotCloseBeforeCloseTime() public {
+        vm.prank(resolver);
+        vm.expectRevert(IknowMarket.TooEarly.selector);
+        market.close();
     }
 
     function testCannotRedeemBeforeFinalization() public {
@@ -145,11 +152,19 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         _resolve(IknowMarket.Outcome.Invalid);
 
         require(market.creatorFeePool() == 0, "creator fee should be forfeited");
-        require(market.lpFeePool() == lpFeeBefore + creatorFee, "forfeited creator fee should move to LPs");
+        require(
+            market.lpFeePool() == lpFeeBefore + creatorFee + DEFAULT_CREATION_BOND,
+            "creator fee and bond should move to LPs"
+        );
+        require(market.creationBond() == 0, "creation bond should be slashed");
 
         vm.prank(creator);
         vm.expectRevert(IknowMarket.InvalidOutcome.selector);
         market.claimCreatorFees(creator, creatorFee);
+
+        vm.prank(creator);
+        vm.expectRevert(IknowMarket.InvalidOutcome.selector);
+        market.claimCreationBond(creator);
     }
 
     function testLosingNoTokensCannotRedeemAfterYesResolution() public {

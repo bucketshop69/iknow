@@ -160,7 +160,8 @@ Fee requirements:
 - Fee rounding must not cause the user to receive less than the stated minimum output or pay more than the stated maximum input.
 - Fee collection must not break the complete-set solvency invariant.
 - Fee recipients must be nonzero when a nonzero fee is configured.
-- LP fees are LP-owned and paid pro-rata when LP shares are removed.
+- LP fees are LP-owned and paid according to per-share accrual when LP shares are removed.
+- LP fees accrue to shares that exist when the fee is earned; LPs who join later cannot capture previously accrued fees.
 - Creator fees are claimable only after a non-`INVALID` resolution.
 - Protocol fees are claimable by the configured protocol fee recipient.
 - If a market resolves `INVALID`, unclaimed creator fees are forfeited into the LP fee bucket.
@@ -175,6 +176,7 @@ LP assumptions:
 - LPs take inventory risk as traders move the pool price.
 - LPs take adverse-selection risk near resolution.
 - LP shares represent a claim on the pool's assets, not a fixed USDC balance.
+- LP fee claims must be tracked by share ownership at accrual time, not by only reading the current share supply at withdrawal time.
 - LP withdrawals must burn or account for LP shares before transferring assets.
 - Initial liquidity may be permanently locked in a small minimum amount to avoid first-LP share inflation attacks.
 - Removing liquidity must not let an LP withdraw collateral needed to back outstanding complete sets held outside the pool.
@@ -193,6 +195,7 @@ Invalid policy should be explicit before deployment. For the MVP, the preferred 
 
 - Holders of matched `YES` and `NO` can merge complete sets for USDC.
 - If single-sided invalid redemption is supported, each `YES` and each `NO` redeems for 0.5 USDC, with rounding down and residual dust retained by the market or sent through an explicit dust policy.
+- Creator bonds are refunded after non-`INVALID` resolution and slashed into the LP fee bucket on `INVALID`.
 
 The implementation must choose one invalid policy and test it directly. It must not leave invalid redemption ambiguous.
 

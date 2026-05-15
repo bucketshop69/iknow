@@ -81,10 +81,10 @@ contract IknowMarketFactory {
         isMarket[marketAddr] = true;
         allMarkets.push(marketAddr);
 
+        emit MarketCreated(marketAddr, msg.sender, specHash, metadataURI, closeTime, creationBond, initialLiquidity);
+
         outcomeToken.setMinter(marketAddr, true);
         usdc.safeTransferFrom(msg.sender, marketAddr, creationBond + initialLiquidity);
         market.seed(initialLiquidity, creationBond);
-
-        emit MarketCreated(marketAddr, msg.sender, specHash, metadataURI, closeTime, creationBond, initialLiquidity);
     }
 }

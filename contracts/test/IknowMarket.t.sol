@@ -8,6 +8,7 @@ import {IERC20} from "../src/interfaces/IERC20.sol";
 interface Vm {
     function expectRevert(bytes4 revertData) external;
     function prank(address msgSender) external;
+    function warp(uint256 newTimestamp) external;
 }
 
 contract IknowMarketTest {
@@ -53,6 +54,7 @@ contract IknowMarketTest {
         trader.approveAll();
 
         uint256 yesBought = trader.buyYes(100 * UNIT);
+        _warpPastClose();
         market.close();
         market.proposeResolution(IknowMarket.Outcome.Yes, "ipfs://evidence");
         market.finalizeResolution();
@@ -75,6 +77,7 @@ contract IknowMarketTest {
         trader.approveAll();
 
         uint256 noBought = trader.buyNo(100 * UNIT);
+        _warpPastClose();
         market.close();
         market.proposeResolution(IknowMarket.Outcome.No, "ipfs://evidence");
         market.finalizeResolution();
@@ -96,6 +99,7 @@ contract IknowMarketTest {
         trader.approveAll();
         trader.split(100 * UNIT);
 
+        _warpPastClose();
         market.close();
         market.proposeResolution(IknowMarket.Outcome.Invalid, "ipfs://invalid-evidence");
         market.finalizeResolution();
@@ -164,7 +168,7 @@ contract IknowMarketTest {
         _assertMarketUsdcAccounting("post-fee split accounting");
     }
 
-    function testRemoveLiquidityPaysProRataLpFees() external {
+    function testRemoveLiquidityPaysClaimableLpFees() external {
         _deployMarket();
         _seed(1_000 * UNIT, 0);
 
@@ -174,13 +178,37 @@ contract IknowMarketTest {
         trader.buyYes(100 * UNIT);
 
         uint256 halfShares = market.lpShares(address(this)) / 2;
-        uint256 expectedLpFeeOut = market.lpFeePool() * halfShares / market.totalLpShares();
+        uint256 expectedLpFeeOut = market.lpFeePool();
         uint256 balanceBefore = usdc.balanceOf(address(this));
 
         market.removeLiquidity(halfShares, 0, 0);
 
         _assertEq(usdc.balanceOf(address(this)), balanceBefore + expectedLpFeeOut, "LP fee paid on remove");
         _assertMarketUsdcAccounting("post-lp fee remove accounting");
+    }
+
+    function testLateLpCannotCapturePriorFees() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 0);
+
+        MarketActor trader = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(trader), 100 * UNIT);
+        trader.approveAll();
+        trader.buyYes(100 * UNIT);
+
+        uint256 priorLpFees = market.lpFeePool();
+
+        MarketActor lateLp = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(lateLp), 100 * UNIT);
+        lateLp.approveAll();
+        uint256 lateShares = lateLp.addLiquidity(100 * UNIT);
+        uint256 lateBalanceBefore = usdc.balanceOf(address(lateLp));
+
+        lateLp.removeLiquidity(lateShares);
+
+        _assertEq(usdc.balanceOf(address(lateLp)), lateBalanceBefore, "late LP captured prior fees");
+        _assertEq(market.lpFeePool(), priorLpFees, "prior LP fees should remain");
+        _assertMarketUsdcAccounting("post-late-lp remove accounting");
     }
 
     function testCreatorFeesClaimOnlyAfterResolution() external {
@@ -198,6 +226,7 @@ contract IknowMarketTest {
         _expectRevert(IknowMarket.InvalidState.selector);
         market.claimCreatorFees(address(this), creatorFee);
 
+        _warpPastClose();
         market.close();
         market.proposeResolution(IknowMarket.Outcome.Yes, "ipfs://evidence");
         market.finalizeResolution();
@@ -232,6 +261,23 @@ contract IknowMarketTest {
         _assertEq(usdc.balanceOf(address(0xBEEF)), balanceBefore + protocolFee, "protocol fee claimed");
         _assertEq(market.protocolFeePool(), 0, "protocol fee bucket cleared");
         _assertMarketUsdcAccounting("post-protocol claim accounting");
+    }
+
+    function testCreationBondClaimableAfterNonInvalidResolution() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 10 * UNIT);
+
+        _warpPastClose();
+        market.close();
+        market.proposeResolution(IknowMarket.Outcome.Yes, "ipfs://evidence");
+        market.finalizeResolution();
+
+        uint256 balanceBefore = usdc.balanceOf(address(this));
+        market.claimCreationBond(address(this));
+
+        _assertEq(usdc.balanceOf(address(this)), balanceBefore + 10 * UNIT, "bond claimed");
+        _assertEq(market.creationBond(), 0, "bond cleared");
+        _assertMarketUsdcAccounting("post-bond claim accounting");
     }
 
     function _deployMarket() private {
@@ -277,6 +323,10 @@ contract IknowMarketTest {
 
     function _expectRevert(bytes4 selector) private {
         vm.expectRevert(selector);
+    }
+
+    function _warpPastClose() private {
+        vm.warp(block.timestamp + 31 days);
     }
 
     function _assertEq(uint256 actual, uint256 expected, string memory message) private pure {
@@ -334,6 +384,10 @@ contract MarketActor {
 
     function addLiquidity(uint256 amount) external returns (uint256) {
         return _market.addLiquidity(amount, 0);
+    }
+
+    function removeLiquidity(uint256 shares) external returns (uint256 yesOut, uint256 noOut) {
+        return _market.removeLiquidity(shares, 0, 0);
     }
 
     function redeemTo(address recipient) external returns (uint256) {

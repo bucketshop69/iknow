@@ -15,7 +15,9 @@ Solidity protocol workspace for the Arc-native iknow prediction market MVP.
 - `1 YES + 1 NO -> 1 USDC unit` before resolution.
 - After resolution, the winning outcome redeems `1:1`; `INVALID` currently unwinds matched YES/NO complete sets.
 - Trades charge `30 bps` total: `20 bps` to an LP-owned fee bucket, `5 bps` to the market creator, and `5 bps` to the protocol recipient.
-- LP fee buckets are paid pro-rata when LP shares are removed. Creator fees are claimable only after non-INVALID resolution; INVALID forfeits unclaimed creator fees into the LP bucket.
+- LP fee buckets accrue by shares held at the time fees are earned; late LPs cannot claim prior fees. Claimable LP fees are paid when LP shares are removed.
+- Creator fees are claimable only after non-INVALID resolution; INVALID forfeits unclaimed creator fees into the LP bucket.
+- Creation bonds are claimable by the creator after non-INVALID resolution; INVALID slashes the bond into the LP bucket.
 
 ## Test
 
@@ -33,7 +35,7 @@ pnpm contracts:build
 pnpm contracts:test
 ```
 
-Current test coverage includes outcome token permissions, complete-set split/merge, factory creation, AMM buy/sell, split-fee accounting, LP fee removal, YES/NO redemption, INVALID complete-set unwind, resolution edge cases, and bounded fuzz accounting.
+Current test coverage includes outcome token permissions, complete-set split/merge, factory creation, AMM buy/sell, split-fee accounting, LP fee isolation/removal, creation bond claim/slash, YES/NO redemption, INVALID complete-set unwind, resolution edge cases, and bounded fuzz accounting.
 
 ## Deployment Notes
 
