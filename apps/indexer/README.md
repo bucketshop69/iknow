@@ -11,3 +11,6 @@ Events to index first:
 - `ResolutionProposed`
 - `MarketResolved`
 - `Redeemed`
+- `ProtocolFeesClaimed`
+- `CreationBondClaimed`
+- `CreationBondSlashed`
