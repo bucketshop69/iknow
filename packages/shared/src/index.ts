@@ -58,6 +58,8 @@ export const deployedMarketSchema = z.object({
   metadataURI: z.string().min(1),
   question: z.string().min(8),
   closeTime: z.number().int().positive(),
+  resolutionSource: z.string().min(1).optional(),
+  invalidConditions: z.array(z.string().min(1)).optional(),
   creationBond: z.string().regex(/^\d+$/),
   initialLiquidity: z.string().regex(/^\d+$/),
   yesTokenId: z.string().regex(/^\d+$/),

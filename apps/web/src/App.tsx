@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { LocalDeployment, MarketDraftResponse } from "@iknow/shared";
+import type { DeployedMarket, LocalDeployment, MarketDraftResponse } from "@iknow/shared";
+import { useAccount, useChainId, useConnect, useDisconnect } from "wagmi";
 import {
   apiBaseUrl,
   contractSurface,
@@ -77,6 +78,17 @@ function App() {
   const markets = dataSource.listMarkets();
   const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
 
+  const refreshDeployment = async () => {
+    setDeploymentState("loading");
+    try {
+      const nextDeployment = await loadLocalDeployment();
+      setDeployment(nextDeployment);
+      setDeploymentState(nextDeployment ? "ready" : "fallback");
+    } catch {
+      setDeploymentState("fallback");
+    }
+  };
+
   useEffect(() => {
     const syncRoute = () => setRoute(initialRoute());
     window.addEventListener("popstate", syncRoute);
@@ -105,6 +117,20 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  const addCreatedMarket = (market: DeployedMarket) => {
+    setDeployment((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        markets: [market, ...current.markets.filter((candidate) => candidate.address !== market.address)],
+      };
+    });
+    navigate({ screen: "market", marketId: market.id });
+  };
 
   const navigate = (nextRoute: Route) => {
     setRoute(nextRoute);
@@ -139,7 +165,8 @@ function App() {
           </button>
         </nav>
         <WalletPanel actor={actor} actorId={actorId} actors={actors} onActorChange={setActorId} />
-        <RuntimePanel surface={surface} state={deploymentState} />
+        <WalletConnectionPanel />
+        <RuntimePanel surface={surface} state={deploymentState} onRefresh={() => void refreshDeployment()} />
       </aside>
 
       <main className="workspace">
@@ -154,7 +181,9 @@ function App() {
             onBack={() => navigate({ screen: "markets" })}
           />
         )}
-        {route.screen === "create" && <CreateScreen actorId={actorId} dataSource={dataSource} />}
+        {route.screen === "create" && (
+          <CreateScreen actorId={actorId} dataSource={dataSource} onMarketCreated={addCreatedMarket} />
+        )}
         {route.screen === "portfolio" && (
           <PortfolioScreen
             actorId={actorId}
@@ -209,7 +238,53 @@ function WalletPanel({
   );
 }
 
-function RuntimePanel({ surface, state }: { surface: ReturnType<typeof contractSurface>; state: string }) {
+function WalletConnectionPanel() {
+  const account = useAccount();
+  const chainId = useChainId();
+  const { connect, connectors, isPending, error } = useConnect();
+  const { disconnect } = useDisconnect();
+  const injectedConnector = connectors[0];
+
+  return (
+    <section className="panel">
+      <div className="panel-title">Wallet</div>
+      <dl className="compact-list">
+        <div>
+          <dt>Status</dt>
+          <dd>{account.isConnected ? "Connected" : "Not connected"}</dd>
+        </div>
+        <div>
+          <dt>Account</dt>
+          <dd>{shortAddress(account.address)}</dd>
+        </div>
+        <div>
+          <dt>Chain id</dt>
+          <dd>{chainId}</dd>
+        </div>
+      </dl>
+      {account.isConnected ? (
+        <button className="secondary" onClick={() => disconnect()}>
+          Disconnect
+        </button>
+      ) : (
+        <button disabled={!injectedConnector || isPending} onClick={() => injectedConnector && connect({ connector: injectedConnector })}>
+          {isPending ? "Connecting..." : "Connect wallet"}
+        </button>
+      )}
+      {error && <p className="error-text">{error.message}</p>}
+    </section>
+  );
+}
+
+function RuntimePanel({
+  surface,
+  state,
+  onRefresh,
+}: {
+  surface: ReturnType<typeof contractSurface>;
+  state: string;
+  onRefresh: () => void;
+}) {
   return (
     <section className="panel">
       <div className="panel-title">Runtime</div>
@@ -239,6 +314,9 @@ function RuntimePanel({ surface, state }: { surface: ReturnType<typeof contractS
           </dd>
         </div>
       </dl>
+      <button className="secondary" onClick={onRefresh}>
+        Refresh deployment
+      </button>
     </section>
   );
 }
@@ -430,7 +508,15 @@ function MarketActionPanel({
   );
 }
 
-function CreateScreen({ actorId, dataSource }: { actorId: string; dataSource: ReturnType<typeof createMarketDataSource> }) {
+function CreateScreen({
+  actorId,
+  dataSource,
+  onMarketCreated,
+}: {
+  actorId: string;
+  dataSource: ReturnType<typeof createMarketDataSource>;
+  onMarketCreated: (market: DeployedMarket) => void;
+}) {
   const [form, setForm] = useState<CreateDraftInput>({
     question: "",
     closeTime: toDateTimeLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
@@ -456,8 +542,9 @@ function CreateScreen({ actorId, dataSource }: { actorId: string; dataSource: Re
     }
     setTxStatus("Create market pending...");
     try {
-      const hash = await dataSource.executeCreateMarket(actorId, draftPreview);
-      setTxStatus(`Create market confirmed: ${shortAddress(hash)}`);
+      const result = await dataSource.executeCreateMarket(actorId, draftPreview);
+      setTxStatus(`Create market confirmed: ${shortAddress(result.hash)}`);
+      onMarketCreated(result.market);
     } catch (caught) {
       setTxStatus(caught instanceof Error ? caught.message : "Create market failed");
     }

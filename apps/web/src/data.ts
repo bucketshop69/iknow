@@ -3,6 +3,7 @@ import {
   localDeploymentSchema,
   marketDraftResponseSchema,
   marketDraftSchema,
+  type DeployedMarket,
   type LocalDeployment,
   type MarketDraftResponse,
 } from "@iknow/shared";
@@ -15,10 +16,12 @@ import {
 import {
   createPublicClient,
   createWalletClient,
+  encodePacked,
   http,
   keccak256,
   maxUint256,
   parseAbi,
+  parseEventLogs,
   parseUnits,
   toHex,
   type Hex,
@@ -180,8 +183,8 @@ export function marketsFromDeployment(deployment: LocalDeployment | null): Marke
     question: market.question,
     status: index === 0 ? "Open" : "Open",
     closeTime: new Date(market.closeTime * 1000).toISOString(),
-    resolutionSource: "Local seed artifact; replace with market metadata in the next API pass.",
-    invalidConditions: ["Local demo market metadata is unavailable."],
+    resolutionSource: market.resolutionSource ?? "Local seed artifact; replace with market metadata in the next API pass.",
+    invalidConditions: market.invalidConditions ?? ["Local demo market metadata is unavailable."],
     metadataURI: market.metadataURI,
     specHash: market.specHash as `0x${string}`,
     creator: "Creator",
@@ -199,9 +202,14 @@ export interface MarketDataSource {
   getMarket: (marketId: string) => MarketReadModel | undefined;
   getPortfolio: (actorId: string) => PortfolioReadModel;
   buildDraftPreview: (input: CreateDraftInput) => Promise<MarketDraftResponse>;
-  executeCreateMarket: (actorId: string, draft: MarketDraftResponse) => Promise<Hex>;
+  executeCreateMarket: (actorId: string, draft: MarketDraftResponse) => Promise<MarketCreationResult>;
   executeBuy: (actorId: string, marketId: string, side: "YES" | "NO", usdcAmount: string) => Promise<Hex>;
   executeAddLiquidity: (actorId: string, marketId: string, usdcAmount: string) => Promise<Hex>;
+}
+
+export interface MarketCreationResult {
+  hash: Hex;
+  market: DeployedMarket;
 }
 
 export function createMarketDataSource(deployment: LocalDeployment | null, actors: DevActor[]): MarketDataSource {
@@ -291,7 +299,7 @@ function clients(deployment: LocalDeployment, actorId: string) {
   };
 }
 
-async function waitForSuccess(deployment: LocalDeployment, hash: Hex): Promise<Hex> {
+async function waitForSuccess(deployment: LocalDeployment, hash: Hex) {
   const publicClient = createPublicClient({
     chain: localChain(deployment),
     transport: http(deployment.chain.rpcUrl),
@@ -301,7 +309,7 @@ async function waitForSuccess(deployment: LocalDeployment, hash: Hex): Promise<H
     throw new Error(`Transaction failed: ${hash}`);
   }
 
-  return hash;
+  return receipt;
 }
 
 async function approveUsdc(deployment: LocalDeployment, actorId: string, spender: Address, amount: bigint) {
@@ -319,7 +327,7 @@ async function executeCreateMarket(
   maybeDeployment: LocalDeployment | null,
   actorId: string,
   draft: MarketDraftResponse,
-): Promise<Hex> {
+): Promise<MarketCreationResult> {
   const deployment = requireDeployment(maybeDeployment);
   const factory = deployment.contracts.iknowMarketFactory.address as Address;
   const { walletClient } = clients(deployment, actorId);
@@ -339,8 +347,35 @@ async function executeCreateMarket(
       BigInt(draft.factoryArgs.initialLiquidity),
     ],
   });
+  const receipt = await waitForSuccess(deployment, hash);
+  const logs = parseEventLogs({
+    abi: iknowMarketFactoryAbi,
+    logs: receipt.logs,
+    eventName: "MarketCreated",
+  });
+  const marketAddress = logs[0]?.args.market;
+  if (!marketAddress) {
+    throw new Error("MarketCreated event missing from createMarket receipt");
+  }
+  const id = `${shortId(draft.draft.question)}-${hash.slice(2, 8)}`;
 
-  return waitForSuccess(deployment, hash);
+  return {
+    hash,
+    market: {
+      id,
+      address: marketAddress,
+      specHash: draft.factoryArgs.specHash,
+      metadataURI: draft.factoryArgs.metadataURI,
+      question: draft.draft.question,
+      closeTime: draft.factoryArgs.closeTime,
+      resolutionSource: draft.draft.resolutionSource,
+      invalidConditions: draft.draft.invalidConditions,
+      creationBond: draft.factoryArgs.creationBond,
+      initialLiquidity: draft.factoryArgs.initialLiquidity,
+      yesTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 0]))).toString(),
+      noTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 1]))).toString(),
+    },
+  };
 }
 
 async function executeBuy(
@@ -371,7 +406,8 @@ async function executeBuy(
     args: [amount, 0n],
   });
 
-  return waitForSuccess(deployment, hash);
+  await waitForSuccess(deployment, hash);
+  return hash;
 }
 
 async function executeAddLiquidity(
@@ -401,7 +437,8 @@ async function executeAddLiquidity(
     args: [amount, 0n],
   });
 
-  return waitForSuccess(deployment, hash);
+  await waitForSuccess(deployment, hash);
+  return hash;
 }
 
 async function buildDraftPreview(input: CreateDraftInput): Promise<MarketDraftResponse> {
