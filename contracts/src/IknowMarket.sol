@@ -38,6 +38,10 @@ contract IknowMarket {
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint256 public constant MAX_FEE_BPS = 1_000;
+    uint256 public constant TOTAL_FEE_BPS = 30;
+    uint256 public constant LP_FEE_BPS = 20;
+    uint256 public constant CREATOR_FEE_BPS = 5;
+    uint256 public constant PROTOCOL_FEE_BPS = 5;
     bytes4 private constant ERC1155_ACCEPTED = 0xf23a6e61;
     bytes4 private constant ERC1155_BATCH_ACCEPTED = 0xbc197c81;
     bytes4 private constant ERC165_INTERFACE_ID = 0x01ffc9a7;
@@ -48,6 +52,7 @@ contract IknowMarket {
     address public immutable factory;
     address public immutable creator;
     address public immutable resolver;
+    address public immutable protocolFeeRecipient;
     bytes32 public immutable specHash;
     string public metadataURI;
     uint256 public immutable closeTime;
@@ -67,7 +72,9 @@ contract IknowMarket {
     uint256 public yesReserve;
     uint256 public noReserve;
     uint256 public collateralBalance;
-    uint256 public feePool;
+    uint256 public lpFeePool;
+    uint256 public creatorFeePool;
+    uint256 public protocolFeePool;
     uint256 public creationBond;
     uint256 public totalLpShares;
 
@@ -100,11 +107,16 @@ contract IknowMarket {
         uint256 outcomeAmount,
         uint256 usdcAmount
     );
-    event FeesClaimed(address indexed recipient, uint256 amount);
+    event FeesAccrued(uint256 lpFee, uint256 creatorFee, uint256 protocolFee);
+    event LpFeesClaimed(address indexed lp, address indexed recipient, uint256 amount);
+    event CreatorFeesClaimed(address indexed recipient, uint256 amount);
+    event ProtocolFeesClaimed(address indexed recipient, uint256 amount);
+    event CreatorFeesForfeited(uint256 amount);
 
     error NotFactory();
     error NotResolver();
     error NotCreator();
+    error NotProtocolFeeRecipient();
     error InvalidState();
     error InvalidAmount();
     error InvalidOutcome();
@@ -142,6 +154,7 @@ contract IknowMarket {
         address factory_,
         address creator_,
         address resolver_,
+        address protocolFeeRecipient_,
         bytes32 specHash_,
         string memory metadataURI_,
         uint256 closeTime_,
@@ -151,14 +164,18 @@ contract IknowMarket {
         if (address(usdc_) == address(0) || outcomeToken_ == address(0) || factory_ == address(0)) {
             revert ZeroAddress();
         }
-        if (creator_ == address(0) || resolver_ == address(0)) revert ZeroAddress();
-        if (feeBps_ > MAX_FEE_BPS) revert InvalidAmount();
+        if (creator_ == address(0) || resolver_ == address(0) || protocolFeeRecipient_ == address(0)) {
+            revert ZeroAddress();
+        }
+        if (LP_FEE_BPS + CREATOR_FEE_BPS + PROTOCOL_FEE_BPS != TOTAL_FEE_BPS) revert InvalidAmount();
+        if (feeBps_ != TOTAL_FEE_BPS || feeBps_ > MAX_FEE_BPS) revert InvalidAmount();
 
         usdc = usdc_;
         outcomeToken = IOutcomeToken(outcomeToken_);
         factory = factory_;
         creator = creator_;
         resolver = resolver_;
+        protocolFeeRecipient = protocolFeeRecipient_;
         specHash = specHash_;
         metadataURI = metadataURI_;
         closeTime = closeTime_;
@@ -247,7 +264,7 @@ contract IknowMarket {
 
         uint256 net = usdcIn - fee;
         usdc.safeTransferFrom(msg.sender, address(this), usdcIn);
-        feePool += fee;
+        _accrueFees(fee);
         collateralBalance += net;
         outcomeToken.mintCompleteSet(address(this), address(this), net, "");
 
@@ -313,7 +330,7 @@ contract IknowMarket {
         if (usdcOut < minUsdcOut) revert Slippage();
         if (grossUsdc > collateralBalance) revert InsufficientLiquidity();
         collateralBalance -= grossUsdc;
-        feePool += fee;
+        _accrueFees(fee);
         usdc.safeTransfer(recipient, usdcOut);
 
         emit Trade(msg.sender, recipient, outcome, false, outcomeIn, usdcOut, fee);
@@ -397,13 +414,20 @@ contract IknowMarket {
         noOut = shares * noReserve / totalLpShares;
         if (yesOut < minYesOut || noOut < minNoOut) revert Slippage();
 
+        uint256 lpFeeOut = shares == totalLpShares ? lpFeePool : lpFeePool * shares / totalLpShares;
+
         lpShares[msg.sender] -= shares;
         totalLpShares -= shares;
+        lpFeePool -= lpFeeOut;
         yesReserve -= yesOut;
         noReserve -= noOut;
 
         if (yesOut != 0) outcomeToken.safeTransferFrom(address(this), recipient, yesTokenId, yesOut, "");
         if (noOut != 0) outcomeToken.safeTransferFrom(address(this), recipient, noTokenId, noOut, "");
+        if (lpFeeOut != 0) {
+            usdc.safeTransfer(recipient, lpFeeOut);
+            emit LpFeesClaimed(msg.sender, recipient, lpFeeOut);
+        }
 
         emit LiquidityRemoved(msg.sender, recipient, shares, yesOut, noOut);
     }
@@ -438,6 +462,12 @@ contract IknowMarket {
 
         finalOutcome = proposedOutcome;
         state = State.Resolved;
+        if (finalOutcome == Outcome.Invalid && creatorFeePool != 0) {
+            uint256 forfeited = creatorFeePool;
+            creatorFeePool = 0;
+            lpFeePool += forfeited;
+            emit CreatorFeesForfeited(forfeited);
+        }
 
         emit MarketResolved(finalOutcome);
     }
@@ -478,16 +508,30 @@ contract IknowMarket {
         emit Redeemed(msg.sender, recipient, finalOutcome, burnAmount, usdcOut);
     }
 
-    function claimFees(address recipient, uint256 amount) external nonReentrant {
+    function claimCreatorFees(address recipient, uint256 amount) external nonReentrant {
         if (msg.sender != creator) revert NotCreator();
         if (recipient == address(0)) revert ZeroAddress();
+        if (state != State.Resolved) revert InvalidState();
+        if (finalOutcome == Outcome.Invalid) revert InvalidOutcome();
         if (amount == 0) revert InvalidAmount();
-        if (amount > feePool) revert InsufficientLiquidity();
+        if (amount > creatorFeePool) revert InsufficientLiquidity();
 
-        feePool -= amount;
+        creatorFeePool -= amount;
         usdc.safeTransfer(recipient, amount);
 
-        emit FeesClaimed(recipient, amount);
+        emit CreatorFeesClaimed(recipient, amount);
+    }
+
+    function claimProtocolFees(address recipient, uint256 amount) external nonReentrant {
+        if (msg.sender != protocolFeeRecipient) revert NotProtocolFeeRecipient();
+        if (recipient == address(0)) revert ZeroAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (amount > protocolFeePool) revert InsufficientLiquidity();
+
+        protocolFeePool -= amount;
+        usdc.safeTransfer(recipient, amount);
+
+        emit ProtocolFeesClaimed(recipient, amount);
     }
 
     function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
@@ -538,10 +582,23 @@ contract IknowMarket {
 
         if (grossUsdc > collateralBalance) revert InsufficientLiquidity();
         collateralBalance -= grossUsdc;
-        feePool += fee;
+        _accrueFees(fee);
         usdc.safeTransfer(recipient, usdcOut);
 
         emit Trade(msg.sender, recipient, outcome, false, outcomeIn, usdcOut, fee);
+    }
+
+    function _accrueFees(uint256 fee) private {
+        if (fee == 0) return;
+        uint256 creatorFee = fee * CREATOR_FEE_BPS / TOTAL_FEE_BPS;
+        uint256 protocolFee = fee * PROTOCOL_FEE_BPS / TOTAL_FEE_BPS;
+        uint256 lpFee = fee - creatorFee - protocolFee;
+
+        lpFeePool += lpFee;
+        creatorFeePool += creatorFee;
+        protocolFeePool += protocolFee;
+
+        emit FeesAccrued(lpFee, creatorFee, protocolFee);
     }
 
     function _quoteBuy(uint256 usdcIn, uint256 buyReserve, uint256 otherReserve)

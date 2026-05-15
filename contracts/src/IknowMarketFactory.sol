@@ -25,22 +25,29 @@ contract IknowMarketFactory {
     error InvalidCloseTime();
     error InvalidAddress();
 
+    uint256 public constant DEFAULT_TOTAL_FEE_BPS = 30;
+
     IERC20 public immutable usdc;
     OutcomeToken public immutable outcomeToken;
     address public resolver;
+    address public protocolFeeRecipient;
     uint256 public defaultChallengeWindow = 1 hours;
-    uint256 public defaultFeeBps = 30;
+    uint256 public defaultFeeBps = DEFAULT_TOTAL_FEE_BPS;
 
     address[] public allMarkets;
     mapping(address => bool) public isMarket;
 
-    constructor(IERC20 usdc_, OutcomeToken outcomeToken_, address resolver_) {
-        if (address(usdc_) == address(0) || address(outcomeToken_) == address(0) || resolver_ == address(0)) {
+    constructor(IERC20 usdc_, OutcomeToken outcomeToken_, address resolver_, address protocolFeeRecipient_) {
+        if (
+            address(usdc_) == address(0) || address(outcomeToken_) == address(0) || resolver_ == address(0)
+                || protocolFeeRecipient_ == address(0)
+        ) {
             revert InvalidAddress();
         }
         usdc = usdc_;
         outcomeToken = outcomeToken_;
         resolver = resolver_;
+        protocolFeeRecipient = protocolFeeRecipient_;
     }
 
     function marketCount() external view returns (uint256) {
@@ -63,6 +70,7 @@ contract IknowMarketFactory {
             address(this),
             msg.sender,
             resolver,
+            protocolFeeRecipient,
             specHash,
             metadataURI,
             closeTime,

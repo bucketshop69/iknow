@@ -18,9 +18,27 @@ export const iknowMarketFactoryAbi = [
         "name": "resolver_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "protocolFeeRecipient_",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "DEFAULT_TOTAL_FEE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -153,6 +171,19 @@ export const iknowMarketFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "protocolFeeRecipient",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "resolver",
     "inputs": [],
     "outputs": [
@@ -278,6 +309,11 @@ export const iknowMarketAbi = [
         "internalType": "address"
       },
       {
+        "name": "protocolFeeRecipient_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "specHash_",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -320,7 +356,59 @@ export const iknowMarketAbi = [
   },
   {
     "type": "function",
+    "name": "CREATOR_FEE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "LP_FEE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_FEE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PROTOCOL_FEE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TOTAL_FEE_BPS",
     "inputs": [],
     "outputs": [
       {
@@ -452,7 +540,25 @@ export const iknowMarketAbi = [
   },
   {
     "type": "function",
-    "name": "claimFees",
+    "name": "claimCreatorFees",
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "claimProtocolFees",
     "inputs": [
       {
         "name": "recipient",
@@ -529,6 +635,19 @@ export const iknowMarketAbi = [
   },
   {
     "type": "function",
+    "name": "creatorFeePool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "evidenceURI",
     "inputs": [],
     "outputs": [
@@ -556,19 +675,6 @@ export const iknowMarketAbi = [
   {
     "type": "function",
     "name": "feeBps",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "feePool",
     "inputs": [],
     "outputs": [
       {
@@ -611,6 +717,19 @@ export const iknowMarketAbi = [
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "lpFeePool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -827,6 +946,32 @@ export const iknowMarketAbi = [
         "name": "",
         "type": "uint8",
         "internalType": "enum IknowMarket.Outcome"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "protocolFeePool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "protocolFeeRecipient",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -1409,7 +1554,7 @@ export const iknowMarketAbi = [
   },
   {
     "type": "event",
-    "name": "FeesClaimed",
+    "name": "CreatorFeesClaimed",
     "inputs": [
       {
         "name": "recipient",
@@ -1419,6 +1564,44 @@ export const iknowMarketAbi = [
       },
       {
         "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CreatorFeesForfeited",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeesAccrued",
+    "inputs": [
+      {
+        "name": "lpFee",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "creatorFee",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "protocolFee",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1502,6 +1685,31 @@ export const iknowMarketAbi = [
   },
   {
     "type": "event",
+    "name": "LpFeesClaimed",
+    "inputs": [
+      {
+        "name": "lp",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "MarketClosed",
     "inputs": [
       {
@@ -1522,6 +1730,25 @@ export const iknowMarketAbi = [
         "type": "uint8",
         "indexed": true,
         "internalType": "enum IknowMarket.Outcome"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProtocolFeesClaimed",
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1670,6 +1897,11 @@ export const iknowMarketAbi = [
   {
     "type": "error",
     "name": "NotFactory",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotProtocolFeeRecipient",
     "inputs": []
   },
   {

@@ -24,7 +24,7 @@ contract IknowMarketInvariantTest is IknowTestBase {
         super.setUp();
 
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
         outcomeToken.transferOwnership(address(factory));
         require(
             DEFAULT_LP_FEE_BPS + DEFAULT_CREATOR_FEE_BPS + DEFAULT_PROTOCOL_FEE_BPS == DEFAULT_TOTAL_FEE_BPS,
@@ -188,7 +188,9 @@ contract IknowMarketInvariantTest is IknowTestBase {
 
     function _assertAccounting() private view {
         require(
-            usdc.balanceOf(address(market)) == market.collateralBalance() + market.feePool() + market.creationBond(),
+            usdc.balanceOf(address(market))
+                == market.collateralBalance() + market.creationBond() + market.lpFeePool() + market.creatorFeePool()
+                    + market.protocolFeePool(),
             "market USDC accounting invariant"
         );
     }

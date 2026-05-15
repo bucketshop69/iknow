@@ -14,7 +14,7 @@ contract IknowMarketFactoryTest is IknowTestBase {
     function setUp() public override {
         super.setUp();
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
         outcomeToken.transferOwnership(address(factory));
     }
 

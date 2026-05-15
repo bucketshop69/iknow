@@ -18,7 +18,7 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         super.setUp();
 
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
         outcomeToken.transferOwnership(address(factory));
 
         closeTime = block.timestamp + 7 days;
@@ -132,6 +132,24 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         vm.prank(trader);
         vm.expectRevert(IknowMarket.InvalidAmount.selector);
         market.redeem();
+    }
+
+    function testInvalidResolutionForfeitsUnclaimedCreatorFeesToLpBucket() public {
+        vm.prank(trader);
+        market.buyYes(DEFAULT_TRADE_AMOUNT, 0);
+
+        uint256 creatorFee = market.creatorFeePool();
+        uint256 lpFeeBefore = market.lpFeePool();
+        require(creatorFee > 0, "expected creator fee");
+
+        _resolve(IknowMarket.Outcome.Invalid);
+
+        require(market.creatorFeePool() == 0, "creator fee should be forfeited");
+        require(market.lpFeePool() == lpFeeBefore + creatorFee, "forfeited creator fee should move to LPs");
+
+        vm.prank(creator);
+        vm.expectRevert(IknowMarket.InvalidOutcome.selector);
+        market.claimCreatorFees(creator, creatorFee);
     }
 
     function testLosingNoTokensCannotRedeemAfterYesResolution() public {

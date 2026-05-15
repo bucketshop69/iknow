@@ -142,14 +142,14 @@ Implementations must guard against double redemption, double LP withdrawal, and 
 
 ## Fee Boundaries
 
-Fees are optional in the MVP but must be bounded when implemented.
+Fees are part of the MVP trade model and must be bounded.
 
-Recommended boundaries:
+MVP fee split:
 
-- `MAX_TRADE_FEE_BPS`: 500 bps (5%).
-- `MAX_CREATOR_FEE_BPS`: 500 bps (5%).
-- `MAX_PROTOCOL_FEE_BPS`: 500 bps (5%).
-- `MAX_TOTAL_FEE_BPS`: 1_000 bps (10%).
+- `TOTAL_FEE_BPS`: 30 bps (0.30%).
+- `LP_FEE_BPS`: 20 bps (0.20%).
+- `CREATOR_FEE_BPS`: 5 bps (0.05%).
+- `PROTOCOL_FEE_BPS`: 5 bps (0.05%).
 - `BPS_DENOMINATOR`: 10_000.
 
 Fee requirements:
@@ -160,6 +160,10 @@ Fee requirements:
 - Fee rounding must not cause the user to receive less than the stated minimum output or pay more than the stated maximum input.
 - Fee collection must not break the complete-set solvency invariant.
 - Fee recipients must be nonzero when a nonzero fee is configured.
+- LP fees are LP-owned and paid pro-rata when LP shares are removed.
+- Creator fees are claimable only after a non-`INVALID` resolution.
+- Protocol fees are claimable by the configured protocol fee recipient.
+- If a market resolves `INVALID`, unclaimed creator fees are forfeited into the LP fee bucket.
 
 ## LP Assumptions
 

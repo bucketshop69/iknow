@@ -5,15 +5,27 @@ import {IknowMarket} from "../src/IknowMarket.sol";
 import {OutcomeToken} from "../src/OutcomeToken.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 
+interface Vm {
+    function expectRevert(bytes4 revertData) external;
+    function prank(address msgSender) external;
+}
+
 contract IknowMarketTest {
+    Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
     uint256 private constant UNIT = 1e6;
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+    uint256 private constant DEFAULT_TOTAL_FEE_BPS = 30;
+    uint256 private constant DEFAULT_LP_FEE_BPS = 20;
+    uint256 private constant DEFAULT_CREATOR_FEE_BPS = 5;
+    uint256 private constant DEFAULT_PROTOCOL_FEE_BPS = 5;
 
     MockUSDC private usdc;
     OutcomeToken private outcome;
     IknowMarket private market;
 
     function testBuySellMaintainsCollateralAccounting() external {
-        _deployMarket(50);
+        _deployMarket();
         _seed(500 * UNIT, 10 * UNIT);
 
         MarketActor trader = new MarketActor(usdc, outcome, market);
@@ -33,7 +45,7 @@ contract IknowMarketTest {
     }
 
     function testResolutionRedeemsWinningYes() external {
-        _deployMarket(0);
+        _deployMarket();
         _seed(1_000 * UNIT, 0);
 
         MarketActor trader = new MarketActor(usdc, outcome, market);
@@ -55,7 +67,7 @@ contract IknowMarketTest {
     }
 
     function testRedeemConvenienceFunctionPaysCaller() external {
-        _deployMarket(0);
+        _deployMarket();
         _seed(1_000 * UNIT, 0);
 
         MarketActor trader = new MarketActor(usdc, outcome, market);
@@ -76,7 +88,7 @@ contract IknowMarketTest {
     }
 
     function testInvalidResolutionUnwindsMatchedCompleteSets() external {
-        _deployMarket(0);
+        _deployMarket();
         _seed(1_000 * UNIT, 0);
 
         MarketActor trader = new MarketActor(usdc, outcome, market);
@@ -98,7 +110,7 @@ contract IknowMarketTest {
     }
 
     function testRemoveLiquidityReturnsPoolInventory() external {
-        _deployMarket(0);
+        _deployMarket();
         _seed(200 * UNIT, 0);
 
         MarketActor trader = new MarketActor(usdc, outcome, market);
@@ -115,7 +127,7 @@ contract IknowMarketTest {
     }
 
     function testAddLiquidityMintsLpShares() external {
-        _deployMarket(0);
+        _deployMarket();
         _seed(500 * UNIT, 0);
 
         MarketActor provider = new MarketActor(usdc, outcome, market);
@@ -131,20 +143,117 @@ contract IknowMarketTest {
         _assertEq(noReserve, 600 * UNIT, "NO reserve after add");
     }
 
-    function _deployMarket(uint256 feeBps) private {
+    function testTradeFeesSplitIntoLpCreatorAndProtocolBuckets() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 0);
+
+        MarketActor trader = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(trader), 100 * UNIT);
+        trader.approveAll();
+
+        trader.buyYes(100 * UNIT);
+
+        uint256 totalFee = 100 * UNIT * DEFAULT_TOTAL_FEE_BPS / BPS_DENOMINATOR;
+        uint256 creatorFee = totalFee * DEFAULT_CREATOR_FEE_BPS / DEFAULT_TOTAL_FEE_BPS;
+        uint256 protocolFee = totalFee * DEFAULT_PROTOCOL_FEE_BPS / DEFAULT_TOTAL_FEE_BPS;
+        uint256 lpFee = totalFee - creatorFee - protocolFee;
+
+        _assertEq(market.lpFeePool(), lpFee, "LP fee bucket");
+        _assertEq(market.creatorFeePool(), creatorFee, "creator fee bucket");
+        _assertEq(market.protocolFeePool(), protocolFee, "protocol fee bucket");
+        _assertMarketUsdcAccounting("post-fee split accounting");
+    }
+
+    function testRemoveLiquidityPaysProRataLpFees() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 0);
+
+        MarketActor trader = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(trader), 100 * UNIT);
+        trader.approveAll();
+        trader.buyYes(100 * UNIT);
+
+        uint256 halfShares = market.lpShares(address(this)) / 2;
+        uint256 expectedLpFeeOut = market.lpFeePool() * halfShares / market.totalLpShares();
+        uint256 balanceBefore = usdc.balanceOf(address(this));
+
+        market.removeLiquidity(halfShares, 0, 0);
+
+        _assertEq(usdc.balanceOf(address(this)), balanceBefore + expectedLpFeeOut, "LP fee paid on remove");
+        _assertMarketUsdcAccounting("post-lp fee remove accounting");
+    }
+
+    function testCreatorFeesClaimOnlyAfterResolution() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 0);
+
+        MarketActor trader = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(trader), 100 * UNIT);
+        trader.approveAll();
+        trader.buyYes(100 * UNIT);
+
+        uint256 creatorFee = market.creatorFeePool();
+        _assertGt(creatorFee, 0, "creator fee accrued");
+
+        _expectRevert(IknowMarket.InvalidState.selector);
+        market.claimCreatorFees(address(this), creatorFee);
+
+        market.close();
+        market.proposeResolution(IknowMarket.Outcome.Yes, "ipfs://evidence");
+        market.finalizeResolution();
+
+        uint256 balanceBefore = usdc.balanceOf(address(this));
+        market.claimCreatorFees(address(this), creatorFee);
+
+        _assertEq(usdc.balanceOf(address(this)), balanceBefore + creatorFee, "creator fee claimed");
+        _assertEq(market.creatorFeePool(), 0, "creator fee bucket cleared");
+        _assertMarketUsdcAccounting("post-creator claim accounting");
+    }
+
+    function testProtocolFeesClaimableByProtocolRecipient() external {
+        _deployMarket();
+        _seed(1_000 * UNIT, 0);
+
+        MarketActor trader = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(trader), 100 * UNIT);
+        trader.approveAll();
+        trader.buyYes(100 * UNIT);
+
+        uint256 protocolFee = market.protocolFeePool();
+        _assertGt(protocolFee, 0, "protocol fee accrued");
+
+        _expectRevert(IknowMarket.NotProtocolFeeRecipient.selector);
+        market.claimProtocolFees(address(this), protocolFee);
+
+        uint256 balanceBefore = usdc.balanceOf(address(0xBEEF));
+        vm.prank(address(0xFEE));
+        market.claimProtocolFees(address(0xBEEF), protocolFee);
+
+        _assertEq(usdc.balanceOf(address(0xBEEF)), balanceBefore + protocolFee, "protocol fee claimed");
+        _assertEq(market.protocolFeePool(), 0, "protocol fee bucket cleared");
+        _assertMarketUsdcAccounting("post-protocol claim accounting");
+    }
+
+    function _deployMarket() private {
         usdc = new MockUSDC();
         outcome = new OutcomeToken("ipfs://iknow/{id}.json");
+        _assertEq(
+            DEFAULT_LP_FEE_BPS + DEFAULT_CREATOR_FEE_BPS + DEFAULT_PROTOCOL_FEE_BPS,
+            DEFAULT_TOTAL_FEE_BPS,
+            "test fee split mismatch"
+        );
         market = new IknowMarket(
             IERC20(address(usdc)),
             address(outcome),
             address(this),
             address(this),
             address(this),
+            address(0xFEE),
             keccak256("iknow market test"),
             "ipfs://market",
             block.timestamp + 30 days,
             0,
-            feeBps
+            DEFAULT_TOTAL_FEE_BPS
         );
         outcome.setMinter(address(market), true);
     }
@@ -160,9 +269,14 @@ contract IknowMarketTest {
     function _assertMarketUsdcAccounting(string memory message) private view {
         _assertEq(
             usdc.balanceOf(address(market)),
-            market.collateralBalance() + market.feePool() + market.creationBond(),
+            market.collateralBalance() + market.lpFeePool() + market.creatorFeePool() + market.protocolFeePool()
+                + market.creationBond(),
             message
         );
+    }
+
+    function _expectRevert(bytes4 selector) private {
+        vm.expectRevert(selector);
     }
 
     function _assertEq(uint256 actual, uint256 expected, string memory message) private pure {
