@@ -1,0 +1,15 @@
+{
+  "name": "@iknow/indexer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"indexer scaffold only\"",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"lint not configured\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

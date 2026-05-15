@@ -1,0 +1,20 @@
+{
+  "name": "iknow",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Arc-native AMM prediction market factory with USDC collateral.",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @iknow/web dev",
+    "dev:api": "pnpm --filter @iknow/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "typescript": "^5.9.3"
+  }
+}
