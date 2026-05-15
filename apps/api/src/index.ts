@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { createMarketDraftResponse } from "./marketDraft.js";
 
 const app = new Hono();
 
@@ -9,13 +10,7 @@ app.get("/health", (c) => {
 
 app.post("/markets/draft", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json({
-    draft: {
-      question: body.question ?? "Will this market resolve YES by the deadline?",
-      outcomes: ["YES", "NO"],
-      status: "placeholder",
-    },
-  });
+  return c.json(createMarketDraftResponse(body));
 });
 
 serve({

@@ -6,6 +6,7 @@ export type IndexedEvent =
   | "ResolutionProposed"
   | "MarketResolved"
   | "Redeemed"
+  | "ProtocolFeesClaimed"
   | "CreationBondClaimed"
   | "CreationBondSlashed";
 
@@ -17,6 +18,7 @@ export const indexedEvents: IndexedEvent[] = [
   "ResolutionProposed",
   "MarketResolved",
   "Redeemed",
+  "ProtocolFeesClaimed",
   "CreationBondClaimed",
   "CreationBondSlashed",
 ];
