@@ -17,7 +17,7 @@ Solidity protocol workspace for the Arc-native iknow prediction market MVP.
 - Trades charge `30 bps` total: `20 bps` to an LP-owned fee bucket, `5 bps` to the market creator, and `5 bps` to the protocol recipient.
 - LP fee buckets accrue by shares held at the time fees are earned; late LPs cannot claim prior fees. Claimable LP fees are paid when LP shares are removed.
 - Creator fees are claimable only after non-INVALID resolution; INVALID forfeits unclaimed creator fees into the LP bucket.
-- Creation bonds are claimable by the creator after non-INVALID resolution; INVALID slashes the bond into the LP bucket.
+- Creation bonds are claimable by the creator after non-INVALID resolution; INVALID slashes the bond into the protocol bucket.
 
 ## Test
 

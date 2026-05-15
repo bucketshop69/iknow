@@ -195,7 +195,7 @@ Invalid policy should be explicit before deployment. For the MVP, the preferred 
 
 - Holders of matched `YES` and `NO` can merge complete sets for USDC.
 - If single-sided invalid redemption is supported, each `YES` and each `NO` redeems for 0.5 USDC, with rounding down and residual dust retained by the market or sent through an explicit dust policy.
-- Creator bonds are refunded after non-`INVALID` resolution and slashed into the LP fee bucket on `INVALID`.
+- Creator bonds are refunded after non-`INVALID` resolution and slashed into the protocol fee bucket on `INVALID`.
 
 The implementation must choose one invalid policy and test it directly. It must not leave invalid redemption ambiguous.
 

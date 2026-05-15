@@ -147,14 +147,16 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
 
         uint256 creatorFee = market.creatorFeePool();
         uint256 lpFeeBefore = market.lpFeePool();
+        uint256 protocolFeeBefore = market.protocolFeePool();
         require(creatorFee > 0, "expected creator fee");
 
         _resolve(IknowMarket.Outcome.Invalid);
 
         require(market.creatorFeePool() == 0, "creator fee should be forfeited");
+        require(market.lpFeePool() == lpFeeBefore + creatorFee, "creator fee should move to LPs");
         require(
-            market.lpFeePool() == lpFeeBefore + creatorFee + DEFAULT_CREATION_BOND,
-            "creator fee and bond should move to LPs"
+            market.protocolFeePool() == protocolFeeBefore + DEFAULT_CREATION_BOND,
+            "slashed bond should move to protocol"
         );
         require(market.creationBond() == 0, "creation bond should be slashed");
 

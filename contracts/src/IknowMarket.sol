@@ -484,7 +484,7 @@ contract IknowMarket {
         if (finalOutcome == Outcome.Invalid && creationBond != 0) {
             uint256 slashed = creationBond;
             creationBond = 0;
-            _accrueLpFees(slashed);
+            protocolFeePool += slashed;
             emit CreationBondSlashed(slashed);
         }
 
