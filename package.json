@@ -11,7 +11,9 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "contracts:build": "cd contracts && forge build",
-    "contracts:test": "cd contracts && forge test"
+    "contracts:test": "cd contracts && forge test",
+    "chain:anvil": "scripts/anvil-local.sh",
+    "chain:deploy": "scripts/deploy-local.sh"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

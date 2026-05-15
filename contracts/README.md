@@ -47,3 +47,15 @@ Deploy order:
 4. Create markets through the factory.
 
 Do not deploy this as production contracts yet. The next hardening step is invariant/fuzz coverage for AMM solvency, LP accounting, and resolution edge cases.
+
+## Local Anvil Deployment
+
+From the repo root:
+
+```bash
+pnpm chain:anvil
+pnpm chain:deploy
+```
+
+The deploy script lives at `script/DeployLocal.s.sol` and writes `deployments/local-anvil.json`.
+It deploys `MockUSDC`, `OutcomeToken`, and `IknowMarketFactory`, transfers outcome-token ownership to the factory, funds deterministic local actors, creates three sample markets, and seeds the first market with demo trades/liquidity.

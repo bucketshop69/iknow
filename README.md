@@ -31,7 +31,12 @@ Foundry scripts require `forge`:
 ```bash
 pnpm contracts:build
 pnpm contracts:test
+pnpm chain:anvil
+pnpm chain:deploy
 ```
+
+`pnpm chain:deploy` writes the local deployment artifact to `contracts/deployments/local-anvil.json`.
+See [docs/local-chain.md](docs/local-chain.md) for the Anvil actor, deploy, and seed flow.
 
 ## Vision
 

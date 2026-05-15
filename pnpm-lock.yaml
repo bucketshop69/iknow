@@ -45,6 +45,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@iknow/abis':
+        specifier: workspace:*
+        version: link:../../packages/abis
+      '@iknow/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@tanstack/react-query':
         specifier: ^5.90.12
         version: 5.100.10(react@19.2.6)

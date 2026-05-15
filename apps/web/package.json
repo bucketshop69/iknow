@@ -11,14 +11,16 @@
     "lint": "echo \"lint not configured\""
   },
   "dependencies": {
+    "@iknow/abis": "workspace:*",
+    "@iknow/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.12",
     "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^6.4.2",
-    "typescript": "^5.9.3",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "typescript": "^5.9.3",
     "viem": "^2.41.2",
-    "wagmi": "^3.1.2",
-    "@tanstack/react-query": "^5.90.12"
+    "vite": "^6.4.2",
+    "wagmi": "^3.1.2"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",
