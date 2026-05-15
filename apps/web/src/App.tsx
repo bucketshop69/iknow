@@ -7,12 +7,14 @@ import {
   createMarketDataSource,
   devActorsFromDeployment,
   loadLocalDeployment,
+  type ResolutionOutcomeInput,
   type TradeAction,
   type TradeQuoteReadback,
 } from "./data";
 import type {
   CreateDraftInput,
   DevActor,
+  MarketLifecycleReadback,
   MarketUserState,
   MarketReadModel,
   PortfolioReadModel,
@@ -494,19 +496,25 @@ function MarketActionPanel({
   const [removeShares, setRemoveShares] = useState("100");
   const [status, setStatus] = useState<string | null>(null);
   const [userState, setUserState] = useState<MarketUserState | null>(null);
+  const [lifecycle, setLifecycle] = useState<MarketLifecycleReadback | null>(null);
   const [readbackStatus, setReadbackStatus] = useState<string | null>(null);
+  const [resolutionOutcome, setResolutionOutcome] = useState<ResolutionOutcomeInput>("YES");
+  const [evidenceURI, setEvidenceURI] = useState("local://evidence/manual-resolution");
 
   useEffect(() => {
     let cancelled = false;
 
     setReadbackStatus("Refreshing position...");
-    dataSource
-      .readMarketUserState(actorId, market.id)
-      .then((nextUserState) => {
+    Promise.all([
+      dataSource.readMarketUserState(actorId, market.id),
+      dataSource.readMarketLifecycle(actorId, market.id),
+    ])
+      .then(([nextUserState, nextLifecycle]) => {
         if (cancelled) {
           return;
         }
         setUserState(nextUserState);
+        setLifecycle(nextLifecycle);
         setReadbackStatus(null);
       })
       .catch((caught) => {
@@ -514,6 +522,7 @@ function MarketActionPanel({
           return;
         }
         setUserState(null);
+        setLifecycle(null);
         setReadbackStatus(caught instanceof Error ? caught.message : "Position readback unavailable");
       });
 
@@ -571,6 +580,14 @@ function MarketActionPanel({
     ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert"].some((token) =>
       message.toLowerCase().includes(token),
     );
+
+  const lifecycleStatus = lifecycle
+    ? lifecycle.state === "Resolved"
+      ? `Resolved ${lifecycle.finalOutcome}`
+      : lifecycle.state === "Resolution proposed"
+        ? `Proposed ${lifecycle.proposedOutcome}`
+        : lifecycle.state
+    : "Unavailable";
 
   const tradeLabel = (action: TradeAction) => {
     if (action === "BUY_YES") {
@@ -632,6 +649,14 @@ function MarketActionPanel({
         <div>
           <dt>Live reserves</dt>
           <dd>{userState ? `${userState.yesReserve} / ${userState.noReserve}` : readbackStatus ? "Unavailable" : "0 / 0"}</dd>
+        </div>
+        <div>
+          <dt>Lifecycle</dt>
+          <dd>{lifecycleStatus}</dd>
+        </div>
+        <div>
+          <dt>Finalize after</dt>
+          <dd>{lifecycle?.finalizeAfter ? formatDate(lifecycle.finalizeAfter) : "-"}</dd>
         </div>
       </dl>
       {readbackStatus && !userState && (
@@ -720,6 +745,94 @@ function MarketActionPanel({
         >
           Remove liquidity
         </button>
+        <label>
+          Resolution outcome
+          <select
+            value={resolutionOutcome}
+            onChange={(event) => setResolutionOutcome(event.target.value as ResolutionOutcomeInput)}
+          >
+            <option value="YES">YES</option>
+            <option value="NO">NO</option>
+            <option value="INVALID">INVALID</option>
+          </select>
+        </label>
+        <label>
+          Evidence URI
+          <input value={evidenceURI} onChange={(event) => setEvidenceURI(event.target.value)} />
+        </label>
+        <div className="button-row lifecycle-actions">
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canClose}
+            onClick={() => runAction("Close market", () => dataSource.executeCloseMarket(actorId, market.id))}
+          >
+            Close
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canPropose}
+            onClick={() =>
+              runAction("Propose resolution", () =>
+                dataSource.executeProposeResolution(actorId, market.id, resolutionOutcome, evidenceURI),
+              )
+            }
+          >
+            Propose
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canFinalize}
+            onClick={() => runAction("Finalize resolution", () => dataSource.executeFinalizeResolution(actorId, market.id))}
+          >
+            Finalize
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canRedeem}
+            onClick={() => runAction("Redeem", () => dataSource.executeRedeem(actorId, market.id))}
+          >
+            Redeem
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canClaimCreatorFees}
+            onClick={() => runAction("Claim creator fees", () => dataSource.executeClaimCreatorFees(actorId, market.id))}
+          >
+            Claim creator
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canClaimProtocolFees}
+            onClick={() => runAction("Claim protocol fees", () => dataSource.executeClaimProtocolFees(actorId, market.id))}
+          >
+            Claim protocol
+          </button>
+          <button
+            className="secondary"
+            disabled={!lifecycle?.canClaimCreationBond}
+            onClick={() => runAction("Claim creation bond", () => dataSource.executeClaimCreationBond(actorId, market.id))}
+          >
+            Claim bond
+          </button>
+        </div>
+        <dl className="compact-list">
+          <div>
+            <dt>Redeemable</dt>
+            <dd>{lifecycle?.redeemable ?? "0 USDC"}</dd>
+          </div>
+          <div>
+            <dt>Creator fees</dt>
+            <dd>{lifecycle?.creatorFees ?? "0 USDC"}</dd>
+          </div>
+          <div>
+            <dt>Protocol fees</dt>
+            <dd>{lifecycle?.protocolFees ?? "0 USDC"}</dd>
+          </div>
+          <div>
+            <dt>Creation bond</dt>
+            <dd>{lifecycle?.creationBond ?? "0 USDC"}</dd>
+          </div>
+        </dl>
       </div>
       {status && <p className={isErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
     </article>
@@ -975,9 +1088,11 @@ function PortfolioScreen({
       <section className="market-table" aria-label="Portfolio positions">
         <div className="market-row portfolio-row table-head">
           <span>Market</span>
+          <span>Status</span>
           <span>YES</span>
           <span>NO</span>
           <span>LP</span>
+          <span>Redeemable</span>
           <span>Claimable</span>
           <span />
         </div>
@@ -988,10 +1103,15 @@ function PortfolioScreen({
         )}
         {portfolio.positions.map((position) => (
           <article className="market-row portfolio-row" key={position.marketId}>
-            <h2>{position.marketQuestion}</h2>
+            <div>
+              <h2>{position.marketQuestion}</h2>
+              <p>{position.resolution}</p>
+            </div>
+            <span className="status">{position.status}</span>
             <span>{position.yesShares}</span>
             <span>{position.noShares}</span>
             <span>{position.lpShares}</span>
+            <span>{position.redeemable}</span>
             <span>{position.claimable}</span>
             <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
               Open

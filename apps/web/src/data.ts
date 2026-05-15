@@ -35,6 +35,7 @@ import type {
   DevActor,
   DevActorRole,
   LpPositionReadback,
+  MarketLifecycleReadback,
   MarketUserState,
   MarketReadModel,
   PortfolioReadModel,
@@ -229,8 +230,21 @@ export interface MarketDataSource {
   executeAddLiquidity: (actorId: string, marketId: string, usdcAmount: string) => Promise<Hex>;
   executeRemoveLiquidity: (actorId: string, marketId: string, lpShares: string) => Promise<Hex>;
   readMarketUserState: (actorId: string, marketId: string) => Promise<MarketUserState>;
+  readMarketLifecycle: (actorId: string, marketId: string) => Promise<MarketLifecycleReadback>;
   readLpPosition: (actorId: string, marketId: string) => Promise<LpPositionReadback>;
   readLpPortfolio: (actorId: string) => Promise<PortfolioReadModel>;
+  executeCloseMarket: (actorId: string, marketId: string) => Promise<Hex>;
+  executeProposeResolution: (
+    actorId: string,
+    marketId: string,
+    outcome: ResolutionOutcomeInput,
+    evidenceURI: string,
+  ) => Promise<Hex>;
+  executeFinalizeResolution: (actorId: string, marketId: string) => Promise<Hex>;
+  executeRedeem: (actorId: string, marketId: string) => Promise<Hex>;
+  executeClaimCreatorFees: (actorId: string, marketId: string) => Promise<Hex>;
+  executeClaimProtocolFees: (actorId: string, marketId: string) => Promise<Hex>;
+  executeClaimCreationBond: (actorId: string, marketId: string) => Promise<Hex>;
 }
 
 export interface MarketCreationResult {
@@ -239,6 +253,7 @@ export interface MarketCreationResult {
 }
 
 export type TradeAction = "BUY_YES" | "BUY_NO" | "SELL_YES" | "SELL_NO";
+export type ResolutionOutcomeInput = "YES" | "NO" | "INVALID";
 
 export interface TradeQuoteReadback {
   action: TradeAction;
@@ -261,21 +276,27 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
     getPortfolio: (actorId) => {
       const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
       const positions = actor.role === "LiquidityProvider"
-        ? markets.slice(0, 1).map((market) => ({
+          ? markets.slice(0, 1).map((market) => ({
             marketId: market.id,
             marketQuestion: market.question,
+            status: market.status,
+            resolution: "Unresolved",
             yesShares: "0",
             noShares: "0",
             lpShares: "500 seeded",
+            redeemable: "0 USDC",
             claimable: "LP fees pending",
           }))
         : actor.role === "TraderYes"
           ? markets.slice(0, 1).map((market) => ({
               marketId: market.id,
               marketQuestion: market.question,
+              status: market.status,
+              resolution: "Unresolved",
               yesShares: "Seeded buy",
               noShares: "0",
               lpShares: "0",
+              redeemable: "Pending resolution",
               claimable: "Pending resolution",
             }))
           : [];
@@ -304,8 +325,17 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
     executeRemoveLiquidity: (actorId, marketId, lpShares) =>
       executeRemoveLiquidity(deployment, actorId, marketId, lpShares),
     readMarketUserState: (actorId, marketId) => readMarketUserState(deployment, actors, markets, actorId, marketId),
+    readMarketLifecycle: (actorId, marketId) => readMarketLifecycle(deployment, actors, actorId, marketId),
     readLpPosition: (actorId, marketId) => readLpPosition(deployment, actors, markets, actorId, marketId),
     readLpPortfolio: (actorId) => readLpPortfolio(deployment, actors, markets, actorId),
+    executeCloseMarket: (actorId, marketId) => executeCloseMarket(deployment, actorId, marketId),
+    executeProposeResolution: (actorId, marketId, outcome, evidenceURI) =>
+      executeProposeResolution(deployment, actorId, marketId, outcome, evidenceURI),
+    executeFinalizeResolution: (actorId, marketId) => executeFinalizeResolution(deployment, actorId, marketId),
+    executeRedeem: (actorId, marketId) => executeRedeem(deployment, actorId, marketId),
+    executeClaimCreatorFees: (actorId, marketId) => executeClaimCreatorFees(deployment, actorId, marketId),
+    executeClaimProtocolFees: (actorId, marketId) => executeClaimProtocolFees(deployment, actorId, marketId),
+    executeClaimCreationBond: (actorId, marketId) => executeClaimCreationBond(deployment, actorId, marketId),
   };
 }
 
@@ -524,6 +554,40 @@ function findMarket(deployment: LocalDeployment, marketId: string) {
   return market;
 }
 
+const stateLabels = ["Open", "Closed", "Resolution proposed", "Resolved"] as const;
+const outcomeLabels = ["Unresolved", "YES", "NO", "INVALID"] as const;
+
+function marketStatusFromState(state: number): MarketReadModel["status"] {
+  return stateLabels[state] ?? "Open";
+}
+
+function outcomeLabel(outcome: number) {
+  return outcomeLabels[outcome] ?? "Unknown";
+}
+
+function outcomeArg(outcome: ResolutionOutcomeInput) {
+  if (outcome === "YES") {
+    return 1;
+  }
+  if (outcome === "NO") {
+    return 2;
+  }
+  return 3;
+}
+
+function redeemableForOutcome(finalOutcome: number, yesBalance: bigint, noBalance: bigint) {
+  if (finalOutcome === 1) {
+    return yesBalance;
+  }
+  if (finalOutcome === 2) {
+    return noBalance;
+  }
+  if (finalOutcome === 3) {
+    return yesBalance < noBalance ? yesBalance : noBalance;
+  }
+  return 0n;
+}
+
 async function readLpPosition(
   maybeDeployment: LocalDeployment | null,
   actors: DevActor[],
@@ -590,6 +654,96 @@ async function readLpPosition(
   };
 }
 
+async function readMarketLifecycle(
+  maybeDeployment: LocalDeployment | null,
+  actors: DevActor[],
+  actorId: string,
+  marketId: string,
+): Promise<MarketLifecycleReadback> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const actor = actors.find((candidate) => candidate.id === actorId);
+  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const marketAddress = market.address as Address;
+  const decimals = deployment.contracts.mockUSDC.decimals;
+  const { publicClient } = clients(deployment, actorId);
+
+  const [
+    state,
+    proposedOutcome,
+    finalOutcome,
+    finalizeAfter,
+    evidenceURI,
+    closeTime,
+    creator,
+    protocolFeeRecipient,
+    creatorFeePool,
+    protocolFeePool,
+    creationBond,
+    yesBalance,
+    noBalance,
+    latestBlock,
+  ] = await Promise.all([
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "state" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "proposedOutcome" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "finalOutcome" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "finalizeAfter" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "evidenceURI" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "closeTime" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "creator" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "protocolFeeRecipient" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "creatorFeePool" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "protocolFeePool" }),
+    publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "creationBond" }),
+    publicClient.readContract({
+      address: deployment.contracts.outcomeToken.address as Address,
+      abi: outcomeTokenAbi,
+      functionName: "balanceOf",
+      args: [actorAddress, BigInt(market.yesTokenId)],
+    }),
+    publicClient.readContract({
+      address: deployment.contracts.outcomeToken.address as Address,
+      abi: outcomeTokenAbi,
+      functionName: "balanceOf",
+      args: [actorAddress, BigInt(market.noTokenId)],
+    }),
+    publicClient.getBlock(),
+  ]);
+  const stateNumber = Number(state);
+  const finalOutcomeNumber = Number(finalOutcome);
+  const proposedOutcomeNumber = Number(proposedOutcome);
+  const now = latestBlock.timestamp;
+  const redeemable = stateNumber === 3 ? redeemableForOutcome(finalOutcomeNumber, yesBalance, noBalance) : 0n;
+  const isCreator = actorAddress.toLowerCase() === creator.toLowerCase();
+  const isProtocolRecipient = actorAddress.toLowerCase() === protocolFeeRecipient.toLowerCase();
+  const isResolver = actor?.role === "Resolver";
+  const resolvedNonInvalid = stateNumber === 3 && finalOutcomeNumber !== 3;
+
+  return {
+    state: marketStatusFromState(stateNumber),
+    proposedOutcome: outcomeLabel(proposedOutcomeNumber),
+    finalOutcome: outcomeLabel(finalOutcomeNumber),
+    closeTime: new Date(Number(closeTime) * 1000).toISOString(),
+    finalizeAfter: finalizeAfter === 0n ? "" : new Date(Number(finalizeAfter) * 1000).toISOString(),
+    evidenceURI,
+    redeemable: `${displayUnits(redeemable, decimals)} USDC`,
+    creatorFees: `${displayUnits(creatorFeePool, decimals)} USDC`,
+    protocolFees: `${displayUnits(protocolFeePool, decimals)} USDC`,
+    creationBond: `${displayUnits(creationBond, decimals)} USDC`,
+    redeemableRaw: redeemable.toString(),
+    creatorFeesRaw: creatorFeePool.toString(),
+    protocolFeesRaw: protocolFeePool.toString(),
+    creationBondRaw: creationBond.toString(),
+    canClose: stateNumber === 0 && now >= closeTime,
+    canPropose: isResolver && (stateNumber === 1 || (stateNumber === 0 && now >= closeTime)),
+    canFinalize: stateNumber === 2 && now >= finalizeAfter,
+    canRedeem: redeemable > 0n,
+    canClaimCreatorFees: isCreator && resolvedNonInvalid && creatorFeePool > 0n,
+    canClaimProtocolFees: isProtocolRecipient && protocolFeePool > 0n,
+    canClaimCreationBond: isCreator && resolvedNonInvalid && creationBond > 0n,
+  };
+}
+
 async function readMarketUserState(
   maybeDeployment: LocalDeployment | null,
   actors: DevActor[],
@@ -635,6 +789,10 @@ async function readMarketUserState(
     lpShares: lpPosition.lpShares,
     pendingLpFees: lpPosition.pendingFees,
     totalLpShares: lpPosition.totalLpShares,
+    yesBalanceRaw: yesBalance.toString(),
+    noBalanceRaw: noBalance.toString(),
+    lpSharesRaw: lpPosition.lpSharesRaw,
+    pendingLpFeesRaw: lpPosition.pendingFeesRaw,
   };
 }
 
@@ -647,20 +805,45 @@ async function readLpPortfolio(
   const deployment = requireDeployment(maybeDeployment);
   const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
   const readbacks = await Promise.all(
-    markets.map((market) => readLpPosition(deployment, actors, markets, actorId, market.id)),
+    markets.map(async (market) => {
+      const [userState, lifecycle] = await Promise.all([
+        readMarketUserState(deployment, actors, markets, actorId, market.id),
+        readMarketLifecycle(deployment, actors, actorId, market.id),
+      ]);
+      const claimableRaw =
+        BigInt(userState.pendingLpFeesRaw) +
+        (lifecycle.canRedeem ? BigInt(lifecycle.redeemableRaw) : 0n) +
+        (lifecycle.canClaimCreatorFees ? BigInt(lifecycle.creatorFeesRaw) : 0n) +
+        (lifecycle.canClaimProtocolFees ? BigInt(lifecycle.protocolFeesRaw) : 0n) +
+        (lifecycle.canClaimCreationBond ? BigInt(lifecycle.creationBondRaw) : 0n);
+
+      return {
+        market,
+        lifecycle,
+        userState,
+        claimableRaw,
+      };
+    }),
   );
   const activeReadbacks = readbacks.filter(
-    (position) => BigInt(position.lpSharesRaw) > 0n || BigInt(position.pendingFeesRaw) > 0n,
+    ({ userState, claimableRaw }) =>
+      BigInt(userState.yesBalanceRaw) > 0n ||
+      BigInt(userState.noBalanceRaw) > 0n ||
+      BigInt(userState.lpSharesRaw) > 0n ||
+      claimableRaw > 0n,
   );
-  const positions = activeReadbacks.map((position) => ({
-    marketId: position.marketId,
-    marketQuestion: position.marketQuestion,
-    yesShares: "0",
-    noShares: "0",
-    lpShares: position.lpShares,
-    claimable: position.pendingFees,
+  const positions = activeReadbacks.map(({ market, lifecycle, userState, claimableRaw }) => ({
+    marketId: market.id,
+    marketQuestion: market.question,
+    status: lifecycle.state,
+    resolution: lifecycle.finalOutcome === "Unresolved" ? lifecycle.proposedOutcome : lifecycle.finalOutcome,
+    yesShares: userState.yesBalance,
+    noShares: userState.noBalance,
+    lpShares: userState.lpShares,
+    redeemable: lifecycle.redeemable,
+    claimable: `${displayUnits(claimableRaw, deployment.contracts.mockUSDC.decimals)} USDC`,
   }));
-  const claimable = activeReadbacks.reduce((total, position) => total + BigInt(position.pendingFeesRaw), 0n);
+  const claimable = activeReadbacks.reduce((total, position) => total + position.claimableRaw, 0n);
 
   return {
     actor,
@@ -830,6 +1013,153 @@ async function executeRemoveLiquidity(
     abi: iknowMarketAbi,
     functionName: "removeLiquidity",
     args: [shares, 0n, 0n],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeCloseMarket(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { walletClient } = clients(deployment, actorId);
+  const hash = await walletClient.writeContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "close",
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeProposeResolution(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+  outcome: ResolutionOutcomeInput,
+  evidenceURI: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { walletClient } = clients(deployment, actorId);
+  const hash = await walletClient.writeContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "proposeResolution",
+    args: [outcomeArg(outcome), evidenceURI || "local://evidence/manual-resolution"],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeFinalizeResolution(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { walletClient } = clients(deployment, actorId);
+  const hash = await walletClient.writeContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "finalizeResolution",
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeRedeem(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { walletClient } = clients(deployment, actorId);
+  const hash = await walletClient.writeContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "redeem",
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeClaimCreatorFees(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const marketAddress = market.address as Address;
+  const { publicClient, walletClient } = clients(deployment, actorId);
+  const recipient = actorAccount(deployment, actorId).address;
+  const amount = await publicClient.readContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: "creatorFeePool",
+  });
+  const hash = await walletClient.writeContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: "claimCreatorFees",
+    args: [recipient, amount],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeClaimProtocolFees(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const marketAddress = market.address as Address;
+  const { publicClient, walletClient } = clients(deployment, actorId);
+  const recipient = actorAccount(deployment, actorId).address;
+  const amount = await publicClient.readContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: "protocolFeePool",
+  });
+  const hash = await walletClient.writeContract({
+    address: marketAddress,
+    abi: iknowMarketAbi,
+    functionName: "claimProtocolFees",
+    args: [recipient, amount],
+  });
+
+  await waitForSuccess(deployment, hash);
+  return hash;
+}
+
+async function executeClaimCreationBond(
+  maybeDeployment: LocalDeployment | null,
+  actorId: string,
+  marketId: string,
+): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { walletClient } = clients(deployment, actorId);
+  const recipient = actorAccount(deployment, actorId).address;
+  const hash = await walletClient.writeContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "claimCreationBond",
+    args: [recipient],
   });
 
   await waitForSuccess(deployment, hash);

@@ -72,14 +72,21 @@ export interface MarketUserState {
   lpShares: string;
   pendingLpFees: string;
   totalLpShares: string;
+  yesBalanceRaw: string;
+  noBalanceRaw: string;
+  lpSharesRaw: string;
+  pendingLpFeesRaw: string;
 }
 
 export interface PortfolioPosition {
   marketId: string;
   marketQuestion: string;
+  status: MarketStatus;
+  resolution: string;
   yesShares: string;
   noShares: string;
   lpShares: string;
+  redeemable: string;
   claimable: string;
 }
 
@@ -91,6 +98,30 @@ export interface LpPositionReadback {
   totalLpShares: string;
   lpSharesRaw: string;
   pendingFeesRaw: string;
+}
+
+export interface MarketLifecycleReadback {
+  state: MarketStatus;
+  proposedOutcome: string;
+  finalOutcome: string;
+  closeTime: string;
+  finalizeAfter: string;
+  evidenceURI: string;
+  redeemable: string;
+  creatorFees: string;
+  protocolFees: string;
+  creationBond: string;
+  redeemableRaw: string;
+  creatorFeesRaw: string;
+  protocolFeesRaw: string;
+  creationBondRaw: string;
+  canClose: boolean;
+  canPropose: boolean;
+  canFinalize: boolean;
+  canRedeem: boolean;
+  canClaimCreatorFees: boolean;
+  canClaimProtocolFees: boolean;
+  canClaimCreationBond: boolean;
 }
 
 export interface PortfolioReadModel {

@@ -37,6 +37,11 @@ button.secondary {
   color: #17202a;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -295,7 +300,12 @@ dd {
 
 .button-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.lifecycle-actions {
+  align-items: end;
 }
 
 .preview-panel.empty {
@@ -310,7 +320,7 @@ dd {
 }
 
 .portfolio-row {
-  grid-template-columns: minmax(240px, 1fr) 80px 80px 110px 170px 78px;
+  grid-template-columns: minmax(240px, 1fr) 132px 118px 118px 118px 132px 132px 78px;
 }
 
 .empty-state {
