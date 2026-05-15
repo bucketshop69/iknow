@@ -71,4 +71,43 @@ contract IknowMarketFactoryTest is IknowTestBase {
         vm.expectRevert(IknowMarketFactory.InvalidAmount.selector);
         factory.createMarket(keccak256("empty market"), "ipfs://market-metadata", block.timestamp + 1 days, 0, 0);
     }
+
+    function testFactoryMarketFullLifecycleHonorsChallengeWindow() public {
+        uint256 closeTime = block.timestamp + 7 days;
+        _approveUSDC(creator, address(factory), DEFAULT_CREATION_BOND + DEFAULT_INITIAL_LIQUIDITY);
+
+        vm.prank(creator);
+        address marketAddr = factory.createMarket(
+            keccak256("Will iknow ship a working MVP?"),
+            "ipfs://market-metadata",
+            closeTime,
+            DEFAULT_CREATION_BOND,
+            DEFAULT_INITIAL_LIQUIDITY
+        );
+
+        IknowMarket market = IknowMarket(marketAddr);
+        _approveUSDC(trader, marketAddr, DEFAULT_TRADE_AMOUNT);
+
+        vm.prank(trader);
+        uint256 yesBought = market.buyYes(DEFAULT_TRADE_AMOUNT, 0);
+
+        vm.warp(closeTime);
+        vm.prank(resolver);
+        market.proposeResolution(IknowMarket.Outcome.Yes, "ipfs://evidence");
+
+        vm.expectRevert(IknowMarket.TooEarly.selector);
+        market.finalizeResolution();
+
+        vm.warp(market.finalizeAfter());
+        market.finalizeResolution();
+
+        uint256 traderBalanceBefore = usdc.balanceOf(trader);
+
+        vm.prank(trader);
+        uint256 redeemed = market.redeem();
+
+        require(redeemed == yesBought, "redeem amount mismatch");
+        require(usdc.balanceOf(trader) == traderBalanceBefore + yesBought, "redeem balance mismatch");
+        require(uint256(market.state()) == uint256(IknowMarket.State.Resolved), "market not resolved");
+    }
 }

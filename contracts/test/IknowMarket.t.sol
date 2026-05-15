@@ -114,6 +114,23 @@ contract IknowMarketTest {
         _assertEq(outcome.balanceOf(address(this), market.noTokenId()), noOut, "lp no received");
     }
 
+    function testAddLiquidityMintsLpShares() external {
+        _deployMarket(0);
+        _seed(500 * UNIT, 0);
+
+        MarketActor provider = new MarketActor(usdc, outcome, market);
+        usdc.mint(address(provider), 100 * UNIT);
+        provider.approveAll();
+
+        uint256 shares = provider.addLiquidity(100 * UNIT);
+        (uint256 yesReserve, uint256 noReserve) = market.reserves();
+
+        _assertEq(shares, 100 * UNIT, "balanced add should mint proportional shares");
+        _assertEq(market.lpShares(address(provider)), shares, "provider LP shares");
+        _assertEq(yesReserve, 600 * UNIT, "YES reserve after add");
+        _assertEq(noReserve, 600 * UNIT, "NO reserve after add");
+    }
+
     function _deployMarket(uint256 feeBps) private {
         usdc = new MockUSDC();
         outcome = new OutcomeToken("ipfs://iknow/{id}.json");
@@ -199,6 +216,10 @@ contract MarketActor {
 
     function split(uint256 amount) external {
         _market.split(amount);
+    }
+
+    function addLiquidity(uint256 amount) external returns (uint256) {
+        return _market.addLiquidity(amount, 0);
     }
 
     function redeemTo(address recipient) external returns (uint256) {
