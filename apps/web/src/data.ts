@@ -34,6 +34,9 @@ import type {
   CreateDraftInput,
   DevActor,
   DevActorRole,
+  EvidenceBriefReadModel,
+  EvidenceInvalidCheckReadModel,
+  EvidencePrepareInput,
   LpPositionReadback,
   MarketLifecycleReadback,
   MarketUserState,
@@ -207,6 +210,8 @@ export interface MarketDataSource {
   getPortfolio: (actorId: string) => PortfolioReadModel;
   readMarkets: () => Promise<MarketReadModel[]>;
   buildDraftPreview: (input: CreateDraftInput) => Promise<MarketDraftResponse>;
+  prepareEvidencePacket: (input: EvidencePrepareInput) => Promise<EvidenceBriefReadModel>;
+  readEvidencePacket: (idOrUri: string) => Promise<EvidenceBriefReadModel>;
   buildTradeQuote: (
     marketId: string,
     action: TradeAction,
@@ -317,6 +322,8 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
     },
     readMarkets: () => readMarkets(deployment),
     buildDraftPreview,
+    prepareEvidencePacket,
+    readEvidencePacket,
     buildTradeQuote: (marketId, action, amount, slippageBps) =>
       buildTradeQuote(deployment, marketId, action, amount, slippageBps),
     executeCreateMarket: (actorId, draft) => executeCreateMarket(deployment, actorId, draft),
@@ -1272,6 +1279,289 @@ async function executeWarpChallengeWindow(maybeDeployment: LocalDeployment | nul
 
   await mineAtOrAfter(deployment, finalizeAfter + 1n);
   return "0x0000000000000000000000000000000000000000000000000000000000000000";
+}
+
+async function prepareEvidencePacket(input: EvidencePrepareInput): Promise<EvidenceBriefReadModel> {
+  const response = await fetch(`${apiBaseUrl}/evidence/prepare`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      actorId: input.actorId,
+      marketId: input.market.id,
+      marketAddress: input.market.address,
+      question: input.market.question,
+      closeTime: input.market.closeTime,
+      resolutionSource: input.market.resolutionSource,
+      invalidConditions: input.market.invalidConditions,
+      metadataURI: input.market.metadataURI,
+      specHash: input.market.specHash,
+    }),
+  });
+  const payload = await readJsonResponse(response, "Prepare evidence packet failed");
+  const packet = evidencePacketPayload(payload);
+  const brief = normalizeEvidenceBrief(packet, input.market.id);
+
+  if (isEvidencePointerOnly(brief, packet)) {
+    return readEvidencePacket(brief.id || brief.evidenceURI);
+  }
+
+  return brief;
+}
+
+async function readEvidencePacket(idOrUri: string): Promise<EvidenceBriefReadModel> {
+  const lookupId = evidenceLookupId(idOrUri);
+  const response = await fetch(`${apiBaseUrl}/evidence/${encodeURIComponent(lookupId)}`);
+  const payload = await readJsonResponse(response, "Fetch evidence packet failed");
+
+  return normalizeEvidenceBrief(evidencePacketPayload(payload), lookupId);
+}
+
+async function readJsonResponse(response: Response, fallbackMessage: string) {
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const payloadRecord = asRecord(payload);
+    const message =
+      stringValue(payloadRecord, "message") ?? stringValue(payloadRecord, "error") ?? `${fallbackMessage}: ${response.status}`;
+    throw new Error(message);
+  }
+
+  return payload;
+}
+
+function evidencePacketPayload(payload: unknown): unknown {
+  const record = asRecord(payload);
+  return record?.packet ?? record?.evidence ?? record?.brief ?? record?.result ?? payload;
+}
+
+function isEvidencePointerOnly(brief: EvidenceBriefReadModel, packet: unknown) {
+  const record = asRecord(packet);
+  return Boolean(
+    record &&
+      (record.id || record.evidenceId || record.packetId || record.evidenceURI || record.evidenceUri || record.uri) &&
+      brief.suggestedOutcome === "UNKNOWN" &&
+      brief.facts.length === 0 &&
+      brief.evidenceLinks.length === 0 &&
+      brief.invalidChecks.length === 0,
+  );
+}
+
+function normalizeEvidenceBrief(packet: unknown, fallbackId: string): EvidenceBriefReadModel {
+  const record = asRecord(packet) ?? {};
+  const recommendation = asRecord(record.recommendation);
+  const resolution = asRecord(record.resolution);
+  const policy = asRecord(record.policy);
+  const id =
+    (stringValue(record, "id") ??
+      stringValue(record, "evidenceId") ??
+      stringValue(record, "packetId") ??
+      evidenceLookupId(stringValue(record, "evidenceURI") ?? stringValue(record, "evidenceUri") ?? "")) ||
+    fallbackId;
+
+  return {
+    id,
+    evidenceURI:
+      stringValue(record, "evidenceURI") ??
+      stringValue(record, "evidenceUri") ??
+      stringValue(record, "uri") ??
+      `local://evidence/${id}`,
+    suggestedOutcome: normalizeEvidenceOutcome(
+      stringValue(record, "suggestedOutcome") ??
+        stringValue(record, "outcome") ??
+        stringValue(recommendation, "outcome") ??
+        stringValue(resolution, "outcome"),
+    ),
+    confidence: normalizeConfidence(numberValue(record, "confidence") ?? numberValue(recommendation, "confidence")),
+    facts: normalizeEvidenceFacts(record.facts ?? record.keyFacts ?? record.findings),
+    evidenceLinks: normalizeEvidenceLinks(record.evidenceLinks ?? record.links ?? record.sources ?? record.citations),
+    invalidChecks: normalizeInvalidChecks(record.invalidChecks ?? record.invalidConditions ?? record.checks),
+    generatedAt:
+      stringValue(record, "generatedAt") ??
+      stringValue(record, "createdAt") ??
+      stringValue(record, "timestamp") ??
+      new Date().toISOString(),
+    agentId:
+      stringValue(record, "agentId") ??
+      stringValue(record, "agent") ??
+      stringValue(asRecord(record.agent), "id") ??
+      "Unknown",
+    policyStatus:
+      stringValue(record, "policyStatus") ??
+      stringValue(policy, "status") ??
+      stringValue(record, "status") ??
+      "Unavailable",
+  };
+}
+
+function evidenceLookupId(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const withoutQuery = trimmed.split(/[?#]/)[0] ?? trimmed;
+  const segments = withoutQuery.split("/").filter(Boolean);
+  return segments[segments.length - 1] ?? trimmed;
+}
+
+function normalizeEvidenceOutcome(value: string | undefined): EvidenceBriefReadModel["suggestedOutcome"] {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "YES" || normalized === "NO" || normalized === "INVALID") {
+    return normalized;
+  }
+
+  return "UNKNOWN";
+}
+
+function normalizeConfidence(value: number | undefined) {
+  if (value === undefined || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return value > 1 && value <= 100 ? value / 100 : value;
+}
+
+function normalizeEvidenceFacts(value: unknown) {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.flatMap((entry, index) => {
+    if (typeof entry === "string") {
+      return [{ label: `Fact ${index + 1}`, value: entry }];
+    }
+    const record = asRecord(entry);
+    if (!record) {
+      return [];
+    }
+    const factValue =
+      stringValue(record, "value") ??
+      stringValue(record, "text") ??
+      stringValue(record, "summary") ??
+      stringValue(record, "fact") ??
+      stringValue(record, "claim");
+    if (!factValue) {
+      return [];
+    }
+
+    return [
+      {
+        label: stringValue(record, "label") ?? stringValue(record, "name") ?? stringValue(record, "title") ?? `Fact ${index + 1}`,
+        value: factValue,
+      },
+    ];
+  });
+}
+
+function normalizeEvidenceLinks(value: unknown) {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.flatMap((entry, index) => {
+    if (typeof entry === "string") {
+      return [{ label: `Evidence ${index + 1}`, url: entry }];
+    }
+    const record = asRecord(entry);
+    if (!record) {
+      return [];
+    }
+    const url = stringValue(record, "url") ?? stringValue(record, "uri") ?? stringValue(record, "href") ?? stringValue(record, "sourceUrl");
+    if (!url) {
+      return [];
+    }
+
+    return [
+      {
+        label:
+          stringValue(record, "label") ??
+          stringValue(record, "title") ??
+          stringValue(record, "name") ??
+          `Evidence ${index + 1}`,
+        url,
+        source: stringValue(record, "source") ?? stringValue(record, "publisher"),
+      },
+    ];
+  });
+}
+
+function normalizeInvalidChecks(value: unknown) {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.flatMap((entry, index): EvidenceInvalidCheckReadModel[] => {
+    if (typeof entry === "string") {
+      return [{ label: entry, status: "unknown" }];
+    }
+    const record = asRecord(entry);
+    if (!record) {
+      return [];
+    }
+
+    return [
+      {
+        label:
+          stringValue(record, "label") ??
+          stringValue(record, "condition") ??
+          stringValue(record, "name") ??
+          `Invalid check ${index + 1}`,
+        status: normalizeInvalidCheckStatus(record),
+        note:
+          stringValue(record, "note") ??
+          stringValue(record, "reason") ??
+          stringValue(record, "message") ??
+          stringValue(record, "explanation"),
+      },
+    ];
+  });
+}
+
+function normalizeInvalidCheckStatus(record: Record<string, unknown>): EvidenceInvalidCheckReadModel["status"] {
+  const status = stringValue(record, "status")?.toLowerCase();
+  if (status === "pass" || status === "passed" || status === "valid" || status === "clear") {
+    return "pass";
+  }
+  if (status === "fail" || status === "failed" || status === "invalid" || status === "triggered") {
+    return "fail";
+  }
+  if (typeof record.passed === "boolean") {
+    return record.passed ? "pass" : "fail";
+  }
+  if (typeof record.isInvalid === "boolean") {
+    return record.isInvalid ? "fail" : "pass";
+  }
+
+  return "unknown";
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function stringValue(record: Record<string, unknown> | undefined, key: string) {
+  const value = record?.[key];
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function numberValue(record: Record<string, unknown> | undefined, key: string) {
+  const value = record?.[key];
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
 }
 
 async function buildDraftPreview(input: CreateDraftInput): Promise<MarketDraftResponse> {

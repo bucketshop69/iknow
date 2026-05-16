@@ -46,6 +46,76 @@ export const marketDraftResponseSchema = z.object({
   factoryArgs: marketFactoryArgsSchema,
 });
 
+export const resolutionOutcomeSchema = z.enum(["YES", "NO", "INVALID"]);
+
+export const resolverEvidenceLinkSchema = z.object({
+  url: z.string().url(),
+  title: z.string().min(1).optional(),
+  publisher: z.string().min(1).optional(),
+  publishedAt: z.string().datetime().optional(),
+  accessedAt: z.string().datetime(),
+});
+
+export const resolverExtractedFactSchema = z.object({
+  claim: z.string().min(1),
+  sourceUrl: z.string().url(),
+  observedAt: z.string().datetime().optional(),
+  supportsOutcome: resolutionOutcomeSchema.optional(),
+});
+
+export const resolverInvalidCheckSchema = z.object({
+  condition: z.string().min(1),
+  status: z.enum(["PASSED", "FAILED", "UNKNOWN"]),
+  explanation: z.string().min(1),
+  evidenceUrls: z.array(z.string().url()).default([]),
+});
+
+export const resolverEvidencePacketSchema = z.object({
+  marketId: z.string().min(1),
+  marketAddress: evmAddressSchema,
+  suggestedOutcome: resolutionOutcomeSchema,
+  confidence: z.number().min(0).max(1),
+  evidenceLinks: z.array(resolverEvidenceLinkSchema).min(1),
+  extractedFacts: z.array(resolverExtractedFactSchema).min(1),
+  invalidChecks: z.array(resolverInvalidCheckSchema).default([]),
+  generatedAt: z.string().datetime(),
+  agentId: z.string().min(1),
+  policyVersion: z.string().min(1).optional(),
+  policyStatus: z.enum(["AUTO_PROPOSE", "REFUSE", "NEEDS_REVIEW"]).optional(),
+  autoPropose: z.boolean().optional(),
+  policyReasons: z.array(z.string().min(1)).optional(),
+});
+
+export const evidencePacketSchema = resolverEvidencePacketSchema;
+
+export const evidencePacketResponseSchema = z.object({
+  packet: evidencePacketSchema,
+  packetHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  evidenceURI: z.string().regex(/^local:\/\/evidence\/0x[a-fA-F0-9]{64}$/),
+});
+
+export const resolverPolicyDecisionSchema = z.object({
+  marketId: z.string().min(1),
+  marketAddress: evmAddressSchema,
+  agentId: z.string().min(1),
+  generatedAt: z.string().datetime(),
+  suggestedOutcome: resolutionOutcomeSchema,
+  confidence: z.number().min(0).max(1),
+  decision: z.enum(["AUTO_PROPOSE", "REFUSE", "NEEDS_REVIEW"]),
+  eligibleForAutonomousResolution: z.boolean(),
+  autoPropose: z.boolean(),
+  refusalReason: z.string().min(1).optional(),
+  needsReviewReasons: z.array(z.string().min(1)).default([]),
+  policyVersion: z.string().min(1),
+  minimumConfidence: z.number().min(0).max(1),
+  metConfidenceThreshold: z.boolean(),
+  metEvidenceThreshold: z.boolean(),
+  metInvalidCheckThreshold: z.boolean(),
+  challengeWindowExpected: z.boolean(),
+  canFinalizeAfterChallenge: z.boolean(),
+  evidencePacket: resolverEvidencePacketSchema.optional(),
+});
+
 export const localActorSchema = z.object({
   address: evmAddressSchema,
   privateKey: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
@@ -99,6 +169,14 @@ export const localDeploymentSchema = z.object({
 });
 
 export type MarketSpecHashInput = z.infer<typeof marketSpecHashInputSchema>;
+export type ResolutionOutcome = z.infer<typeof resolutionOutcomeSchema>;
+export type ResolverEvidenceLink = z.infer<typeof resolverEvidenceLinkSchema>;
+export type ResolverExtractedFact = z.infer<typeof resolverExtractedFactSchema>;
+export type ResolverInvalidCheck = z.infer<typeof resolverInvalidCheckSchema>;
+export type ResolverEvidencePacket = z.infer<typeof resolverEvidencePacketSchema>;
+export type ResolverPolicyDecision = z.infer<typeof resolverPolicyDecisionSchema>;
+export type EvidencePacket = z.infer<typeof evidencePacketSchema>;
+export type EvidencePacketResponse = z.infer<typeof evidencePacketResponseSchema>;
 export type MarketFactoryArgs = z.infer<typeof marketFactoryArgsSchema>;
 export type MarketDraftResponse = z.infer<typeof marketDraftResponseSchema>;
 export type LocalActor = z.infer<typeof localActorSchema>;

@@ -1,0 +1,25 @@
+{
+  "name": "@iknow/resolver",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "evidence:prepare": "tsx src/cli.ts prepare",
+    "evidence:propose": "tsx src/cli.ts propose",
+    "evidence:finalize": "tsx src/cli.ts finalize",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/*.test.ts",
+    "lint": "echo \"lint not configured\""
+  },
+  "dependencies": {
+    "@iknow/abis": "workspace:*",
+    "@iknow/shared": "workspace:*",
+    "viem": "^2.41.2",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

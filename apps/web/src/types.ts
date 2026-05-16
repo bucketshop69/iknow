@@ -124,6 +124,41 @@ export interface MarketLifecycleReadback {
   canClaimCreationBond: boolean;
 }
 
+export interface EvidenceFactReadModel {
+  label: string;
+  value: string;
+}
+
+export interface EvidenceLinkReadModel {
+  label: string;
+  url: string;
+  source?: string;
+}
+
+export interface EvidenceInvalidCheckReadModel {
+  label: string;
+  status: "pass" | "fail" | "unknown";
+  note?: string;
+}
+
+export interface EvidenceBriefReadModel {
+  id: string;
+  evidenceURI: string;
+  suggestedOutcome: "YES" | "NO" | "INVALID" | "UNKNOWN";
+  confidence: number | null;
+  facts: EvidenceFactReadModel[];
+  evidenceLinks: EvidenceLinkReadModel[];
+  invalidChecks: EvidenceInvalidCheckReadModel[];
+  generatedAt: string;
+  agentId: string;
+  policyStatus: string;
+}
+
+export interface EvidencePrepareInput {
+  actorId: string;
+  market: MarketReadModel;
+}
+
 export interface PortfolioReadModel {
   actor: DevActor;
   positions: PortfolioPosition[];

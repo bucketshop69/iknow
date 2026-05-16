@@ -171,6 +171,12 @@ h2 {
   margin-bottom: 6px;
 }
 
+h3 {
+  font-size: 14px;
+  line-height: 1.35;
+  margin: 0;
+}
+
 p {
   color: #607086;
   line-height: 1.5;
@@ -269,6 +275,111 @@ dd {
   color: #354154;
   margin-bottom: 0;
   padding-left: 20px;
+}
+
+.section-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.section-header p {
+  margin-bottom: 0;
+}
+
+.evidence-card {
+  display: grid;
+  gap: 16px;
+}
+
+.evidence-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(220px, 1fr) auto auto;
+}
+
+.evidence-brief {
+  display: grid;
+  gap: 16px;
+}
+
+.evidence-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence-columns {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence-list {
+  border-top: 1px solid #e6ebf1;
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.evidence-list ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.evidence-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.evidence-list strong {
+  color: #354154;
+  font-size: 13px;
+}
+
+.evidence-list span,
+.evidence-list a {
+  color: #607086;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.evidence-list a {
+  color: #143f8c;
+  font-weight: 700;
+}
+
+.check-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  margin-right: 6px;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.check-status.pass {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.check-status.fail {
+  background: #fee4e2;
+  color: #b42318;
+}
+
+.check-status.unknown {
+  background: #edf2f7;
+  color: #354154;
+}
+
+.empty-copy {
+  color: #607086;
+  margin-bottom: 0;
 }
 
 .create-layout {
@@ -380,6 +491,12 @@ dd {
   .metric-grid {
     grid-template-columns: 1fr;
   }
+
+  .evidence-controls,
+  .evidence-columns,
+  .evidence-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -390,6 +507,7 @@ dd {
 
   .page-header,
   .action-grid,
+  .section-header,
   .two-column {
     display: grid;
     grid-template-columns: 1fr;

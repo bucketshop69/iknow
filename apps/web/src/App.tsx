@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { DeployedMarket, LocalDeployment, MarketDraftResponse } from "@iknow/shared";
 import { useAccount, useChainId, useConnect, useDisconnect } from "wagmi";
 import {
@@ -14,6 +14,7 @@ import {
 import type {
   CreateDraftInput,
   DevActor,
+  EvidenceBriefReadModel,
   MarketLifecycleReadback,
   MarketUserState,
   MarketReadModel,
@@ -59,14 +60,30 @@ const routePath = (route: Route) => {
 const shortAddress = (address?: string) =>
   address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not deployed";
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("en", {
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(date);
+};
+
+const formatConfidence = (value: number | null) => {
+  if (value === null) {
+    return "Unknown";
+  }
+
+  return `${Math.round(value * 100)}%`;
+};
+
+const isUrl = (value: string) => /^https?:\/\//i.test(value);
 
 const toDateTimeLocal = (date: Date) => {
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -500,6 +517,14 @@ function MarketDetailScreen({
           </ul>
         </article>
 
+        <EvidenceBriefPanel
+          actorId={actorId}
+          market={market}
+          dataSource={dataSource}
+          refreshKey={refreshKey}
+          onTransactionConfirmed={onTransactionConfirmed}
+        />
+
         <MarketActionPanel
           actorId={actorId}
           market={market}
@@ -509,6 +534,239 @@ function MarketDetailScreen({
         />
       </section>
     </>
+  );
+}
+
+function EvidenceBriefPanel({
+  actorId,
+  market,
+  dataSource,
+  refreshKey,
+  onTransactionConfirmed,
+}: {
+  actorId: string;
+  market: MarketReadModel;
+  dataSource: ReturnType<typeof createMarketDataSource>;
+  refreshKey: number;
+  onTransactionConfirmed: () => void;
+}) {
+  const [lifecycle, setLifecycle] = useState<MarketLifecycleReadback | null>(null);
+  const [brief, setBrief] = useState<EvidenceBriefReadModel | null>(null);
+  const [lookupValue, setLookupValue] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    dataSource
+      .readMarketLifecycle(actorId, market.id)
+      .then((nextLifecycle) => {
+        if (!cancelled) {
+          setLifecycle(nextLifecycle);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLifecycle(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorId, dataSource, market.id, refreshKey]);
+
+  useEffect(() => {
+    setBrief(null);
+    setLookupValue("");
+    setStatus(null);
+  }, [market.id]);
+
+  const showBrief = (nextBrief: EvidenceBriefReadModel) => {
+    setBrief(nextBrief);
+    setLookupValue(nextBrief.evidenceURI);
+  };
+
+  const prepareBrief = async () => {
+    setStatus("Preparing evidence packet...");
+    try {
+      const nextBrief = await dataSource.prepareEvidencePacket({ actorId, market });
+      showBrief(nextBrief);
+      setStatus("Evidence packet ready.");
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Prepare evidence packet failed");
+    }
+  };
+
+  const fetchBrief = async () => {
+    if (!lookupValue.trim()) {
+      return;
+    }
+
+    setStatus("Fetching evidence packet...");
+    try {
+      const nextBrief = await dataSource.readEvidencePacket(lookupValue);
+      showBrief(nextBrief);
+      setStatus("Evidence packet loaded.");
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Fetch evidence packet failed");
+    }
+  };
+
+  const proposeWithEvidence = async () => {
+    if (!brief || brief.suggestedOutcome === "UNKNOWN") {
+      return;
+    }
+
+    setStatus("Propose with evidence pending...");
+    try {
+      const hash = await dataSource.executeProposeResolution(
+        actorId,
+        market.id,
+        brief.suggestedOutcome,
+        brief.evidenceURI,
+      );
+      setStatus(`Propose with evidence confirmed: ${shortAddress(hash)}`);
+      onTransactionConfirmed();
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Propose with evidence failed");
+    }
+  };
+
+  const isResolverActor = actorId === "resolver";
+  const canPrepare = lifecycle?.state === "Closed" || Boolean(lifecycle?.canPropose);
+  const canPropose = Boolean(isResolverActor && lifecycle?.canPropose && brief && brief.suggestedOutcome !== "UNKNOWN");
+  const isErrorStatus = Boolean(
+    status &&
+      ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "unavailable"].some((token) =>
+        status.toLowerCase().includes(token),
+      ),
+  );
+
+  return (
+    <article className="wide-card evidence-card">
+      <div className="section-header">
+        <div>
+          <h2>Evidence brief</h2>
+          <p>Prepare or fetch the resolution packet for a closed market.</p>
+        </div>
+        <span className="status">{lifecycle?.state ?? "Lifecycle unavailable"}</span>
+      </div>
+
+      <div className="evidence-controls">
+        <button className="secondary" disabled={!canPrepare} onClick={prepareBrief}>
+          Prepare packet
+        </button>
+        <label>
+          Evidence id or URI
+          <input value={lookupValue} onChange={(event) => setLookupValue(event.target.value)} />
+        </label>
+        <button className="secondary" disabled={!lookupValue.trim()} onClick={fetchBrief}>
+          Fetch packet
+        </button>
+        <button disabled={!canPropose} onClick={proposeWithEvidence}>
+          Propose with evidence
+        </button>
+      </div>
+
+      {!isResolverActor && (
+        <p className="status-text">Switch to the Resolver actor to submit the packet-backed proposal.</p>
+      )}
+      {status && <p className={isErrorStatus ? "error-text" : "status-text"}>{status}</p>}
+
+      {brief ? <EvidenceBriefView brief={brief} /> : <p className="empty-copy">No evidence packet loaded.</p>}
+    </article>
+  );
+}
+
+function EvidenceBriefView({ brief }: { brief: EvidenceBriefReadModel }) {
+  return (
+    <div className="evidence-brief">
+      <dl className="compact-list evidence-summary">
+        <div>
+          <dt>Suggested outcome</dt>
+          <dd>{brief.suggestedOutcome}</dd>
+        </div>
+        <div>
+          <dt>Confidence</dt>
+          <dd>{formatConfidence(brief.confidence)}</dd>
+        </div>
+        <div>
+          <dt>Policy status</dt>
+          <dd>{brief.policyStatus}</dd>
+        </div>
+        <div>
+          <dt>Generated at</dt>
+          <dd>{formatDate(brief.generatedAt)}</dd>
+        </div>
+        <div>
+          <dt>Agent id</dt>
+          <dd>{brief.agentId}</dd>
+        </div>
+        <div>
+          <dt>Evidence URI</dt>
+          <dd>{brief.evidenceURI}</dd>
+        </div>
+      </dl>
+
+      <div className="evidence-columns">
+        <EvidenceList title="Facts" emptyLabel="No facts returned.">
+          {brief.facts.map((fact) => (
+            <li key={`${fact.label}-${fact.value}`}>
+              <strong>{fact.label}</strong>
+              <span>{fact.value}</span>
+            </li>
+          ))}
+        </EvidenceList>
+
+        <EvidenceList title="Evidence links" emptyLabel="No evidence links returned.">
+          {brief.evidenceLinks.map((link) => (
+            <li key={`${link.label}-${link.url}`}>
+              <strong>{link.label}</strong>
+              {isUrl(link.url) ? (
+                <a href={link.url} target="_blank" rel="noreferrer">
+                  {link.source ?? link.url}
+                </a>
+              ) : (
+                <span>{link.source ? `${link.source}: ${link.url}` : link.url}</span>
+              )}
+            </li>
+          ))}
+        </EvidenceList>
+
+        <EvidenceList title="Invalid checks" emptyLabel="No invalid checks returned.">
+          {brief.invalidChecks.map((check) => (
+            <li key={`${check.label}-${check.status}`}>
+              <strong>{check.label}</strong>
+              <span>
+                <span className={`check-status ${check.status}`}>{check.status}</span>
+                {check.note ? ` ${check.note}` : ""}
+              </span>
+            </li>
+          ))}
+        </EvidenceList>
+      </div>
+    </div>
+  );
+}
+
+function EvidenceList({
+  title,
+  emptyLabel,
+  children,
+}: {
+  title: string;
+  emptyLabel: string;
+  children: ReactNode;
+}) {
+  const items = Array.isArray(children) ? children.filter(Boolean) : children;
+  const isEmpty = Array.isArray(items) ? items.length === 0 : !items;
+
+  return (
+    <section className="evidence-list">
+      <h3>{title}</h3>
+      {isEmpty ? <p className="empty-copy">{emptyLabel}</p> : <ul>{items}</ul>}
+    </section>
   );
 }
 
@@ -936,7 +1194,7 @@ function CreateScreen({
     }
   };
 
-  const onSubmit = async (event: React.FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
       setDraftPreview(await dataSource.buildDraftPreview(form));
