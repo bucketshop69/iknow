@@ -81,7 +81,10 @@ function App() {
   const [actorId, setActorId] = useState("traderYes");
   const surface = useMemo(() => contractSurface(deployment), [deployment]);
   const dataSource = useMemo(() => createMarketDataSource(deployment, actors), [deployment, actors]);
-  const markets = dataSource.listMarkets();
+  const fallbackMarkets = dataSource.listMarkets();
+  const [liveMarkets, setLiveMarkets] = useState<MarketReadModel[] | null>(null);
+  const [marketReadbackStatus, setMarketReadbackStatus] = useState<string | null>(null);
+  const markets = liveMarkets ?? fallbackMarkets;
   const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
   const [chainRefreshKey, setChainRefreshKey] = useState(0);
 
@@ -129,6 +132,32 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setMarketReadbackStatus("Refreshing live markets...");
+    dataSource
+      .readMarkets()
+      .then((nextMarkets) => {
+        if (cancelled) {
+          return;
+        }
+        setLiveMarkets(nextMarkets);
+        setMarketReadbackStatus(null);
+      })
+      .catch((caught) => {
+        if (cancelled) {
+          return;
+        }
+        setLiveMarkets(null);
+        setMarketReadbackStatus(caught instanceof Error ? caught.message : "Live market readback unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, chainRefreshKey]);
 
   const addCreatedMarket = (market: DeployedMarket) => {
     setDeployment((current) => {
@@ -183,11 +212,15 @@ function App() {
 
       <main className="workspace">
         {route.screen === "markets" && (
-          <MarketsScreen markets={markets} onOpenMarket={(marketId) => navigate({ screen: "market", marketId })} />
+          <MarketsScreen
+            markets={markets}
+            readbackStatus={marketReadbackStatus}
+            onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
+          />
         )}
         {route.screen === "market" && (
           <MarketDetailScreen
-            market={dataSource.getMarket(route.marketId)}
+            market={markets.find((market) => market.id === route.marketId) ?? dataSource.getMarket(route.marketId)}
             actorId={actorId}
             dataSource={dataSource}
             refreshKey={chainRefreshKey}
@@ -338,9 +371,11 @@ function RuntimePanel({
 
 function MarketsScreen({
   markets,
+  readbackStatus,
   onOpenMarket,
 }: {
   markets: MarketReadModel[];
+  readbackStatus: string | null;
   onOpenMarket: (marketId: string) => void;
 }) {
   return (
@@ -352,6 +387,9 @@ function MarketsScreen({
         </div>
         <span className="count-pill">{markets.length} markets</span>
       </header>
+      {readbackStatus && (
+        <p className={readbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{readbackStatus}</p>
+      )}
 
       <section className="market-table" aria-label="Markets">
         <div className="market-row table-head">
@@ -766,6 +804,13 @@ function MarketActionPanel({
         <div className="button-row lifecycle-actions">
           <button
             className="secondary"
+            disabled={lifecycle?.state !== "Open"}
+            onClick={() => runAction("Warp to close", () => dataSource.executeWarpToClose(market.id))}
+          >
+            Warp close
+          </button>
+          <button
+            className="secondary"
             disabled={!lifecycle?.canClose}
             onClick={() => runAction("Close market", () => dataSource.executeCloseMarket(actorId, market.id))}
           >
@@ -788,6 +833,13 @@ function MarketActionPanel({
             onClick={() => runAction("Finalize resolution", () => dataSource.executeFinalizeResolution(actorId, market.id))}
           >
             Finalize
+          </button>
+          <button
+            className="secondary"
+            disabled={lifecycle?.state !== "Resolution proposed"}
+            onClick={() => runAction("Warp challenge", () => dataSource.executeWarpChallengeWindow(market.id))}
+          >
+            Warp challenge
           </button>
           <button
             className="secondary"

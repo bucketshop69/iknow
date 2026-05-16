@@ -205,6 +205,7 @@ export interface MarketDataSource {
   listMarkets: () => MarketReadModel[];
   getMarket: (marketId: string) => MarketReadModel | undefined;
   getPortfolio: (actorId: string) => PortfolioReadModel;
+  readMarkets: () => Promise<MarketReadModel[]>;
   buildDraftPreview: (input: CreateDraftInput) => Promise<MarketDraftResponse>;
   buildTradeQuote: (
     marketId: string,
@@ -245,6 +246,8 @@ export interface MarketDataSource {
   executeClaimCreatorFees: (actorId: string, marketId: string) => Promise<Hex>;
   executeClaimProtocolFees: (actorId: string, marketId: string) => Promise<Hex>;
   executeClaimCreationBond: (actorId: string, marketId: string) => Promise<Hex>;
+  executeWarpToClose: (marketId: string) => Promise<Hex>;
+  executeWarpChallengeWindow: (marketId: string) => Promise<Hex>;
 }
 
 export interface MarketCreationResult {
@@ -312,6 +315,7 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
         },
       };
     },
+    readMarkets: () => readMarkets(deployment),
     buildDraftPreview,
     buildTradeQuote: (marketId, action, amount, slippageBps) =>
       buildTradeQuote(deployment, marketId, action, amount, slippageBps),
@@ -336,6 +340,8 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
     executeClaimCreatorFees: (actorId, marketId) => executeClaimCreatorFees(deployment, actorId, marketId),
     executeClaimProtocolFees: (actorId, marketId) => executeClaimProtocolFees(deployment, actorId, marketId),
     executeClaimCreationBond: (actorId, marketId) => executeClaimCreationBond(deployment, actorId, marketId),
+    executeWarpToClose: (marketId) => executeWarpToClose(deployment, marketId),
+    executeWarpChallengeWindow: (marketId) => executeWarpChallengeWindow(deployment, marketId),
   };
 }
 
@@ -453,6 +459,54 @@ function minOutForSlippage(amountOut: bigint, slippageBps?: number) {
 
 function tokenAmountLabel(deployment: LocalDeployment, amount: bigint, symbol: string) {
   return `${displayUnits(amount, deployment.contracts.mockUSDC.decimals)} ${symbol}`;
+}
+
+function priceFromReserves(yesReserve: bigint, noReserve: bigint) {
+  const total = yesReserve + noReserve;
+  if (total === 0n) {
+    return { yesPrice: 0.5, noPrice: 0.5 };
+  }
+
+  const yesPrice = Number(noReserve) / Number(total);
+  return { yesPrice, noPrice: 1 - yesPrice };
+}
+
+async function readMarkets(maybeDeployment: LocalDeployment | null): Promise<MarketReadModel[]> {
+  const deployment = requireDeployment(maybeDeployment);
+  const { publicClient } = clients(deployment, "deployer");
+  const decimals = deployment.contracts.mockUSDC.decimals;
+
+  return Promise.all(
+    deployment.markets.map(async (market) => {
+      const marketAddress = market.address as Address;
+      const [reserves, totalLpShares, state] = await Promise.all([
+        publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "reserves" }),
+        publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "totalLpShares" }),
+        publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "state" }),
+      ]);
+      const [yesReserve, noReserve] = reserves;
+      const { yesPrice, noPrice } = priceFromReserves(yesReserve, noReserve);
+
+      return {
+        id: market.id || shortId(market.question),
+        address: market.address as Address,
+        question: market.question,
+        status: marketStatusFromState(Number(state)),
+        closeTime: new Date(market.closeTime * 1000).toISOString(),
+        resolutionSource: market.resolutionSource ?? "Local seed artifact; replace with market metadata in the next API pass.",
+        invalidConditions: market.invalidConditions ?? ["Local demo market metadata is unavailable."],
+        metadataURI: market.metadataURI,
+        specHash: market.specHash as `0x${string}`,
+        creator: "Creator",
+        yesPrice,
+        noPrice,
+        liquidity: `${displayUnits(totalLpShares, decimals)} LP`,
+        yesReserve: `${displayUnits(yesReserve, decimals)} YES`,
+        noReserve: `${displayUnits(noReserve, decimals)} NO`,
+        volume24h: "Local live",
+      };
+    }),
+  );
 }
 
 async function quoteTrade(
@@ -1164,6 +1218,60 @@ async function executeClaimCreationBond(
 
   await waitForSuccess(deployment, hash);
   return hash;
+}
+
+async function rpcRequest(deployment: LocalDeployment, method: string, params: unknown[] = []) {
+  const response = await fetch(deployment.chain.rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const result = await response.json() as { error?: { message?: string }; result?: unknown };
+  if (result.error) {
+    throw new Error(result.error.message ?? `${method} failed`);
+  }
+
+  return result.result;
+}
+
+async function mineAtOrAfter(deployment: LocalDeployment, timestamp: bigint) {
+  const { publicClient } = clients(deployment, "deployer");
+  const block = await publicClient.getBlock();
+  if (block.timestamp < timestamp) {
+    await rpcRequest(deployment, "evm_setNextBlockTimestamp", [Number(timestamp)]);
+  }
+  await rpcRequest(deployment, "evm_mine");
+}
+
+async function executeWarpToClose(maybeDeployment: LocalDeployment | null, marketId: string): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { publicClient } = clients(deployment, "deployer");
+  const closeTime = await publicClient.readContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "closeTime",
+  });
+
+  await mineAtOrAfter(deployment, closeTime + 1n);
+  return "0x0000000000000000000000000000000000000000000000000000000000000000";
+}
+
+async function executeWarpChallengeWindow(maybeDeployment: LocalDeployment | null, marketId: string): Promise<Hex> {
+  const deployment = requireDeployment(maybeDeployment);
+  const market = findMarket(deployment, marketId);
+  const { publicClient } = clients(deployment, "deployer");
+  const finalizeAfter = await publicClient.readContract({
+    address: market.address as Address,
+    abi: iknowMarketAbi,
+    functionName: "finalizeAfter",
+  });
+  if (finalizeAfter === 0n) {
+    throw new Error("No active challenge window");
+  }
+
+  await mineAtOrAfter(deployment, finalizeAfter + 1n);
+  return "0x0000000000000000000000000000000000000000000000000000000000000000";
 }
 
 async function buildDraftPreview(input: CreateDraftInput): Promise<MarketDraftResponse> {
