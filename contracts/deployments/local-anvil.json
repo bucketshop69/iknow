@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAtBlockTimestamp": 1778853266,
+  "generatedAtBlockTimestamp": 1779494411,
   "chain": {
     "id": 31337,
     "name": "Anvil Local",
@@ -8,14 +8,14 @@
   },
   "contracts": {
     "mockUSDC": {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "address": "0x9A676e781A523b5d0C0e43731313A708CB607508",
       "decimals": 6
     },
     "outcomeToken": {
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016"
     },
     "iknowMarketFactory": {
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "address": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1"
     }
   },
   "actors": {
@@ -51,39 +51,39 @@
   "markets": [
     {
       "id": "ship-mvp",
-      "address": "0x75537828f2ce51be7289709686A69CbFDbB714F1",
+      "address": "0x24B3c7704709ed1491473F30393FFc93cFB0FC34",
       "question": "Will iknow ship a local trading MVP this month?",
-      "specHash": "0x61180a7cdc483fd67f06a71061eecc6285aba6716574400b76f23fbe9336fb5d",
+      "specHash": "0xa2b6fb81ca753e4be593fba43a5372b8b4945e0434f08e540d5a458059c51ed0",
       "metadataURI": "urn:iknow:market:ship-mvp",
-      "closeTime": 1779458066,
+      "closeTime": 1780099211,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "13356019042827335003599339113782984771729996064606396221996052493917707190435",
-      "noTokenId": "43971821190244757305050428130779237890151744274811105816306332428170750786292"
+      "yesTokenId": "58347922456548762655567415139977330875251252916004821930768587430947573469339",
+      "noTokenId": "35332522435747922414301053477106908082150286797683150446556177316004598421399"
     },
     {
       "id": "arc-testnet-volume",
-      "address": "0xE451980132E65465d0a498c53f0b5227326Dd73F",
+      "address": "0x033488800Ae672726c34620D4Bd817E1590d4cDc",
       "question": "Will Arc testnet daily transaction volume exceed 100k next week?",
-      "specHash": "0xf1e47ccf671306b7530182a79f58bd35c1a6c01ac5d96a4051308fb206aaf6a5",
+      "specHash": "0x378614b2126e0c93b0ef5be72345af4d164c69e9ff6916d773ea6088b57385c6",
       "metadataURI": "urn:iknow:market:arc-testnet-volume",
-      "closeTime": 1779717266,
+      "closeTime": 1780358411,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "115176635794221103324093777546213483320774555049022571643997787290826598334593",
-      "noTokenId": "15566633774941786207321685163367955001935053785271059781004040073390476779764"
+      "yesTokenId": "47496654817621240215948322341675026856160046480086086562786493045712615813108",
+      "noTokenId": "50988726259034471047256511028565651927324825214448876417295649267394992835542"
     },
     {
       "id": "first-creator-fee",
-      "address": "0x5392A33F7F677f59e833FEBF4016cDDD88fF9E67",
+      "address": "0x29BDCBc116f3775698AE0ffE5F8fbBaf95F240CF",
       "question": "Will the first demo market accrue creator fees before close?",
-      "specHash": "0x904fa41809f98a2a14f2ed345e38516a81b33be797396cf4f98d42e20b84f6cc",
+      "specHash": "0x7a3eb4f5b48c51433e388614aad120aaae522ed63e62fbef0a7117395eef6422",
       "metadataURI": "urn:iknow:market:first-creator-fee",
-      "closeTime": 1779890066,
+      "closeTime": 1780531211,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "110706959622756485538861056750526016785129194181998657284156924348078310050566",
-      "noTokenId": "24257039321371063099088482365986830041778892753953905644268673277770972483547"
+      "yesTokenId": "54795197568648177657369843854847005643222408960575399381608639770947459778225",
+      "noTokenId": "18827730375040527630001519880369627758136569670940257697902665572527644071379"
     }
   ]
 }

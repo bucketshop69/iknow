@@ -588,6 +588,7 @@ function MarketActionPanel({
         ? `Proposed ${lifecycle.proposedOutcome}`
         : lifecycle.state
     : "Unavailable";
+  const isOpenMarket = lifecycle?.state === "Open";
 
   const tradeLabel = (action: TradeAction) => {
     if (action === "BUY_YES") {
@@ -706,16 +707,16 @@ function MarketActionPanel({
           <p className={quoteStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{quoteStatus}</p>
         )}
         <div className="button-row">
-          <button onClick={() => runTrade("BUY_YES")}>
+          <button disabled={!isOpenMarket} onClick={() => runTrade("BUY_YES")}>
             Buy YES
           </button>
-          <button onClick={() => runTrade("BUY_NO")}>
+          <button disabled={!isOpenMarket} onClick={() => runTrade("BUY_NO")}>
             Buy NO
           </button>
-          <button onClick={() => runTrade("SELL_YES")}>
+          <button disabled={!isOpenMarket} onClick={() => runTrade("SELL_YES")}>
             Sell YES
           </button>
-          <button onClick={() => runTrade("SELL_NO")}>
+          <button disabled={!isOpenMarket} onClick={() => runTrade("SELL_NO")}>
             Sell NO
           </button>
         </div>
@@ -729,6 +730,7 @@ function MarketActionPanel({
         </label>
         <button
           className="secondary"
+          disabled={!isOpenMarket}
           onClick={() => runAction("Add liquidity", () => dataSource.executeAddLiquidity(actorId, market.id, liquidityAmount))}
         >
           Add liquidity
@@ -739,6 +741,7 @@ function MarketActionPanel({
         </label>
         <button
           className="secondary"
+          disabled={!isOpenMarket}
           onClick={() =>
             runAction("Remove liquidity", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
           }
