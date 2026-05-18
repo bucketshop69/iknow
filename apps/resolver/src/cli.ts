@@ -1,5 +1,6 @@
+import "dotenv/config";
 import { readDeployment, defaultDeploymentPath } from "./deployment.js";
-import { finalizeMarkets, prepareMarkets, proposeMarkets, type RunnerOptions } from "./runner.js";
+import { finalizeMarkets, prepareMarkets, proposeMarkets, type ResolverBrainMode, type RunnerOptions } from "./runner.js";
 
 type Command = "prepare" | "propose" | "finalize";
 
@@ -27,7 +28,9 @@ async function main() {
 
 function parseCommand(value: string | undefined): Command {
   if (value === "prepare" || value === "propose" || value === "finalize") return value;
-  throw new Error("Usage: tsx src/cli.ts <prepare|propose|finalize> [--market <id|address>] [--allow-propose] [--allow-finalize]");
+  throw new Error(
+    "Usage: tsx src/cli.ts <prepare|propose|finalize> [--market <id|address>] [--brain auto|mock|llm] [--allow-propose] [--allow-finalize]",
+  );
 }
 
 function parseOptions(args: string[]): RunnerOptions & { deploymentPath: string } {
@@ -46,6 +49,8 @@ function parseOptions(args: string[]): RunnerOptions & { deploymentPath: string 
       options.marketId = requireValue(args, ++index, arg);
     } else if (arg === "--agent-id") {
       options.agentId = requireValue(args, ++index, arg);
+    } else if (arg === "--brain") {
+      options.brainMode = parseBrainMode(requireValue(args, ++index, arg));
     } else if (arg === "--api-base-url") {
       options.apiBaseUrl = requireValue(args, ++index, arg);
     } else if (arg === "--min-confidence") {
@@ -68,6 +73,14 @@ function requireValue(args: string[], index: number, flag: string): string {
   const value = args[index];
   if (!value) throw new Error(`Missing value for ${flag}`);
   return value;
+}
+
+function parseBrainMode(value: string): ResolverBrainMode {
+  if (value === "auto" || value === "mock" || value === "llm") {
+    return value;
+  }
+
+  throw new Error(`Invalid --brain value: ${value}`);
 }
 
 main().catch((error) => {

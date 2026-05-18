@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAtBlockTimestamp": 1780102814,
+  "generatedAtBlockTimestamp": 1784530820,
   "chain": {
     "id": 31337,
     "name": "Anvil Local",
@@ -8,14 +8,14 @@
   },
   "contracts": {
     "mockUSDC": {
-      "address": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
+      "address": "0x2B0d36FACD61B71CC05ab8F3D2355ec3631C0dd5",
       "decimals": 6
     },
     "outcomeToken": {
-      "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933"
+      "address": "0xfbC22278A96299D91d41C453234d97b4F5Eb9B2d"
     },
     "iknowMarketFactory": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
+      "address": "0x46b142DD1E924FAb83eCc3c08e4D46E82f005e0E"
     }
   },
   "actors": {
@@ -51,39 +51,57 @@
   "markets": [
     {
       "id": "ship-mvp",
-      "address": "0x4F57F9239eFCBf43e5920f579D03B3849C588396",
+      "address": "0x179961c9e51F1449c85Be5699e623F38b652Fb84",
       "question": "Will iknow ship a local trading MVP this month?",
-      "specHash": "0x159b8a697243c647b07cba63d1bc4eae0051fbc431f0be1c402bed6136fe35d8",
+      "specHash": "0xe1edea2f7783b9ce1f3badbcc11297965cf92ded4288ece927621161cf26ef28",
       "metadataURI": "urn:iknow:market:ship-mvp",
-      "closeTime": 1780707614,
+      "resolutionSource": "Local project evidence and deployment state.",
+      "closeTime": 1785135620,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "6525824282054564071677042496067414491306526191582979446499933638087820920160",
-      "noTokenId": "82291859164169852620100594489793814814200307479602173436315230351101597872014"
+      "yesTokenId": "60153710455753720884276176426441583689883926902520769406584229088390200901593",
+      "noTokenId": "23888248731045508140751639904408275731548137267635656065380202825796086392779"
     },
     {
       "id": "arc-testnet-volume",
-      "address": "0xF3c6CF1C13EcC07204BEFce90EE14B5Bf8BbA4c9",
+      "address": "0x0860ACac9452853bC9465986312f23b8161A1095",
       "question": "Will Arc testnet daily transaction volume exceed 100k next week?",
-      "specHash": "0xafbe28484c224c3250a643631633cda187f50ad09bdff8cfdf41565cb3f40742",
+      "specHash": "0xbac3dec1a32723b1562095d82c00417e6f42a8f08d89d2388fd2ac958a6db884",
       "metadataURI": "urn:iknow:market:arc-testnet-volume",
-      "closeTime": 1780966814,
+      "resolutionSource": "Arc testnet explorer daily transaction counts.",
+      "invalidConditions": ["Explorer data is unavailable or contradictory."],
+      "closeTime": 1785394820,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "50994735837947645709024289211673943976245481824881895931031026936060013641765",
-      "noTokenId": "44388115664610768787995704890554106183329724784825972453994976690598192471142"
+      "yesTokenId": "88530595577388063806421759017737921206724923799249934862040692303986425586085",
+      "noTokenId": "25743509506918483598250299822047362995796985626150593253997042424917590902794"
     },
     {
       "id": "first-creator-fee",
-      "address": "0x09601fBa6C50825Ff4A95112008311e21f3f24d9",
+      "address": "0x89133c7b5A223BAD530Cb653851df1C014B81f81",
       "question": "Will the first demo market accrue creator fees before close?",
-      "specHash": "0xf6cfabce11469b559bdad166e07f2902eba8e4c72212783d9b041bb9c82a737a",
+      "specHash": "0xdbc916e9cdb38eab404c65d7589556c38f7972938e00a2ebff1596dfc63363cb",
       "metadataURI": "urn:iknow:market:first-creator-fee",
-      "closeTime": 1781139614,
+      "resolutionSource": "On-chain creatorFeePool read from the first demo market.",
+      "closeTime": 1785567620,
       "creationBond": "100000000",
       "initialLiquidity": "1000000000",
-      "yesTokenId": "115533312810685543463246180390131451160097003697392679783981032360715249959754",
-      "noTokenId": "15376140083112188193540805398973216716267812764877712681081245668715777755342"
+      "yesTokenId": "3839981578606410188857639227042392264629220964857392172342355809724728022648",
+      "noTokenId": "77580207825676550024358083129531544870751140220731873012334707214556478255285"
+    },
+    {
+      "id": "epl-arsenal-chelsea",
+      "address": "0xB25B89470C68E1878c6016C1409652754feBFb82",
+      "question": "Will Arsenal beat Chelsea in the local mock EPL result?",
+      "specHash": "0xa3228da96cf27a3244d278e5bc801cbd1595a022e021187a46f8c218ca34b472",
+      "metadataURI": "urn:iknow:market:epl-arsenal-chelsea",
+      "resolutionSource": "Local mock EPL result source: Arsenal 2-1 Chelsea, match status Final.",
+      "invalidConditions": ["Resolve INVALID only if the local mock EPL result is missing, not final, or names different teams."],
+      "closeTime": 1785654020,
+      "creationBond": "100000000",
+      "initialLiquidity": "1000000000",
+      "yesTokenId": "9235274165678763695611876197825022224157922210448943651754586502319168956120",
+      "noTokenId": "37408576001460310701048972199167027934064625167780219673020847060893283304119"
     }
   ]
 }

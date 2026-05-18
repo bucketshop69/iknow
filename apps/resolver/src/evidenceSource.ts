@@ -140,10 +140,17 @@ function invalidChecksFor(market: DeployedMarket): EvidencePacket["invalidChecks
 
   return conditions.map((condition) => ({
     condition,
-    status: "UNKNOWN" as const,
-    explanation: "The deterministic local mock source cannot verify this invalid condition yet.",
-    evidenceUrls: [],
+    status: isLocalMockEplCondition(condition) ? ("PASSED" as const) : ("UNKNOWN" as const),
+    explanation: isLocalMockEplCondition(condition)
+      ? "The deterministic local EPL source has a final Arsenal 2-1 Chelsea result for the named teams."
+      : "The deterministic local mock source cannot verify this invalid condition yet.",
+    evidenceUrls: isLocalMockEplCondition(condition) ? ["local://epl/results/arsenal-vs-chelsea"] : [],
   }));
+}
+
+function isLocalMockEplCondition(condition: string) {
+  const normalized = condition.toLowerCase();
+  return normalized.includes("local mock epl") || normalized.includes("arsenal") || normalized.includes("chelsea");
 }
 
 function resolveEplMarket(

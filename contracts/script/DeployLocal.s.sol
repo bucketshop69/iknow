@@ -57,6 +57,8 @@ contract DeployLocal {
         string id;
         string question;
         string metadataURI;
+        string resolutionSource;
+        string invalidCondition;
         bytes32 specHash;
         uint256 closeTime;
         uint256 creationBond;
@@ -70,7 +72,7 @@ contract DeployLocal {
         MockUSDC usdc;
         OutcomeToken outcomeToken;
         IknowMarketFactory factory;
-        MarketSeed[3] markets;
+        MarketSeed[4] markets;
     }
 
     function run() external {
@@ -125,7 +127,7 @@ contract DeployLocal {
         deployment.usdc.mint(deployment.actors.liquidityProvider, LP_USDC_BALANCE);
     }
 
-    function _createMarkets(IknowMarketFactory factory) private returns (MarketSeed[3] memory markets) {
+    function _createMarkets(IknowMarketFactory factory) private returns (MarketSeed[4] memory markets) {
         uint256 baseCloseTime = block.timestamp + 7 days;
 
         markets[0] = _createMarket(
@@ -133,6 +135,8 @@ contract DeployLocal {
             "ship-mvp",
             "Will iknow ship a local trading MVP this month?",
             "urn:iknow:market:ship-mvp",
+            "Local project evidence and deployment state.",
+            "",
             baseCloseTime
         );
         markets[1] = _createMarket(
@@ -140,6 +144,8 @@ contract DeployLocal {
             "arc-testnet-volume",
             "Will Arc testnet daily transaction volume exceed 100k next week?",
             "urn:iknow:market:arc-testnet-volume",
+            "Arc testnet explorer daily transaction counts.",
+            "Explorer data is unavailable or contradictory.",
             baseCloseTime + 3 days
         );
         markets[2] = _createMarket(
@@ -147,7 +153,18 @@ contract DeployLocal {
             "first-creator-fee",
             "Will the first demo market accrue creator fees before close?",
             "urn:iknow:market:first-creator-fee",
+            "On-chain creatorFeePool read from the first demo market.",
+            "",
             baseCloseTime + 5 days
+        );
+        markets[3] = _createMarket(
+            factory,
+            "epl-arsenal-chelsea",
+            "Will Arsenal beat Chelsea in the local mock EPL result?",
+            "urn:iknow:market:epl-arsenal-chelsea",
+            "Local mock EPL result source: Arsenal 2-1 Chelsea, match status Final.",
+            "Resolve INVALID only if the local mock EPL result is missing, not final, or names different teams.",
+            baseCloseTime + 6 days
         );
     }
 
@@ -156,12 +173,16 @@ contract DeployLocal {
         string memory id,
         string memory question,
         string memory metadataURI,
+        string memory resolutionSource,
+        string memory invalidCondition,
         uint256 closeTime
     ) private returns (MarketSeed memory seed) {
         seed.id = id;
         seed.question = question;
         seed.metadataURI = metadataURI;
-        seed.specHash = keccak256(abi.encode(id, question, metadataURI, closeTime));
+        seed.resolutionSource = resolutionSource;
+        seed.invalidCondition = invalidCondition;
+        seed.specHash = keccak256(abi.encode(id, question, metadataURI, resolutionSource, invalidCondition, closeTime));
         seed.closeTime = closeTime;
         seed.creationBond = CREATION_BOND;
         seed.initialLiquidity = INITIAL_LIQUIDITY;
@@ -170,20 +191,32 @@ contract DeployLocal {
 
     function _seedDemoTrades(Deployment memory deployment) private {
         IknowMarket market = IknowMarket(deployment.markets[0].market);
+        IknowMarket eplMarket = IknowMarket(deployment.markets[3].market);
 
         vm.startBroadcast(TRADER_YES_PK);
         deployment.usdc.approve(address(market), SAMPLE_BUY);
         market.buyYes(SAMPLE_BUY, 0);
+        deployment.usdc.approve(address(eplMarket), SAMPLE_BUY);
+        eplMarket.buyYes(SAMPLE_BUY, 0);
         vm.stopBroadcast();
 
         vm.startBroadcast(TRADER_NO_PK);
         deployment.usdc.approve(address(market), SAMPLE_BUY);
         market.buyNo(SAMPLE_BUY, 0);
+        deployment.usdc.approve(address(eplMarket), SAMPLE_BUY / 2);
+        eplMarket.buyNo(SAMPLE_BUY / 2, 0);
         vm.stopBroadcast();
 
         vm.startBroadcast(LP_PK);
         deployment.usdc.approve(address(market), INITIAL_LIQUIDITY / 2);
         market.addLiquidity(INITIAL_LIQUIDITY / 2, 0);
+        deployment.usdc.approve(address(eplMarket), INITIAL_LIQUIDITY / 4);
+        eplMarket.addLiquidity(INITIAL_LIQUIDITY / 4, 0);
+        vm.stopBroadcast();
+
+        vm.startBroadcast(TRADER_YES_PK);
+        deployment.usdc.approve(address(eplMarket), SAMPLE_BUY / 2);
+        eplMarket.buyYes(SAMPLE_BUY / 2, 0);
         vm.stopBroadcast();
     }
 
@@ -206,7 +239,8 @@ contract DeployLocal {
         json = string.concat(json, '  "markets": [\n');
         json = string.concat(json, _marketJson(deployment.markets[0], deployment.outcomeToken, true));
         json = string.concat(json, _marketJson(deployment.markets[1], deployment.outcomeToken, true));
-        json = string.concat(json, _marketJson(deployment.markets[2], deployment.outcomeToken, false));
+        json = string.concat(json, _marketJson(deployment.markets[2], deployment.outcomeToken, true));
+        json = string.concat(json, _marketJson(deployment.markets[3], deployment.outcomeToken, false));
         json = string.concat(json, "  ]\n");
         return string.concat(json, "}\n");
     }
@@ -260,6 +294,12 @@ contract DeployLocal {
         json = string.concat(json, '      "question": "', market.question, '",\n');
         json = string.concat(json, '      "specHash": "', vm.toString(market.specHash), '",\n');
         json = string.concat(json, '      "metadataURI": "', market.metadataURI, '",\n');
+        if (bytes(market.resolutionSource).length != 0) {
+            json = string.concat(json, '      "resolutionSource": "', market.resolutionSource, '",\n');
+        }
+        if (bytes(market.invalidCondition).length != 0) {
+            json = string.concat(json, '      "invalidConditions": ["', market.invalidCondition, '"],\n');
+        }
         json = string.concat(json, '      "closeTime": ', vm.toString(market.closeTime), ",\n");
         json = string.concat(json, '      "creationBond": "', vm.toString(market.creationBond), '",\n');
         json = string.concat(json, '      "initialLiquidity": "', vm.toString(market.initialLiquidity), '",\n');

@@ -2,15 +2,19 @@ import type { DeployedMarket, LocalDeployment } from "@iknow/shared";
 import { finalizeResolution, proposeResolution, readMarketSnapshot } from "./chain.js";
 import { localEvidenceURI, postEvidencePacket } from "./api.js";
 import { buildEvidencePacket, explainAmbiguity } from "./evidenceSource.js";
+import { buildLlmEvidencePacket } from "./llmEvidenceSource.js";
 import { canFinalizeResolution, canPrepareEvidence, canProposeResolution, defaultPolicy, outcomeToContractValue } from "./policy.js";
 import type { PolicyOptions } from "./policy.js";
 import type { EvidenceDecision, PrepareResult } from "./types.js";
+
+export type ResolverBrainMode = "auto" | "mock" | "llm";
 
 export type RunnerOptions = Partial<PolicyOptions> & {
   agentId?: string;
   apiBaseUrl?: string;
   postEvidence?: boolean;
   marketId?: string;
+  brainMode?: ResolverBrainMode;
 };
 
 export async function prepareMarkets(deployment: LocalDeployment, options: RunnerOptions = {}): Promise<PrepareResult[]> {
@@ -75,7 +79,8 @@ async function prepareMarket(
     return refusal(market, "market already has a proposed resolution", 1);
   }
 
-  const packet = buildEvidencePacket(market, snapshot, options.agentId ?? "iknow-resolver-local");
+  const agentId = options.agentId ?? agentIdFor(options.brainMode);
+  const packet = await buildPacket(market, snapshot, agentId, options.brainMode ?? "auto");
   if (!packet) {
     const ambiguous = explainAmbiguity(market, snapshot);
     return refusal(
@@ -114,6 +119,27 @@ async function prepareMarket(
 function selectMarkets(deployment: LocalDeployment, marketId: string | undefined): DeployedMarket[] {
   if (!marketId) return deployment.markets;
   return deployment.markets.filter((market) => market.id === marketId || market.address.toLowerCase() === marketId.toLowerCase());
+}
+
+async function buildPacket(
+  market: DeployedMarket,
+  snapshot: Awaited<ReturnType<typeof readMarketSnapshot>>,
+  agentId: string,
+  brainMode: ResolverBrainMode,
+) {
+  if (brainMode === "llm" || (brainMode === "auto" && process.env.MINIMAX_API_KEY)) {
+    return buildLlmEvidencePacket(market, snapshot, agentId);
+  }
+
+  return buildEvidencePacket(market, snapshot, agentId);
+}
+
+function agentIdFor(brainMode: ResolverBrainMode | undefined) {
+  if (brainMode === "llm" || ((brainMode === undefined || brainMode === "auto") && process.env.MINIMAX_API_KEY)) {
+    return "iknow-resolver-minimax";
+  }
+
+  return "iknow-resolver-local";
 }
 
 function refusal(market: DeployedMarket, reason: string, confidence: number): EvidenceDecision {
