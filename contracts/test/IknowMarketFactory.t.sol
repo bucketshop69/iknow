@@ -14,7 +14,7 @@ contract IknowMarketFactoryTest is IknowTestBase {
     function setUp() public override {
         super.setUp();
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury, 1 hours);
         outcomeToken.transferOwnership(address(factory));
     }
 
@@ -70,6 +70,59 @@ contract IknowMarketFactoryTest is IknowTestBase {
         vm.prank(creator);
         vm.expectRevert(IknowMarketFactory.InvalidAmount.selector);
         factory.createMarket(keccak256("empty market"), "ipfs://market-metadata", block.timestamp + 1 days, 0, 0);
+    }
+
+    function testCreateMarketRejectsBelowMinimumCreationBond() public {
+        uint256 minBond = 5 * ONE_USDC;
+        uint256 minLiquidity = 10 * ONE_USDC;
+        _approveUSDC(creator, address(factory), minBond + minLiquidity);
+
+        vm.prank(creator);
+        vm.expectRevert(IknowMarketFactory.InvalidAmount.selector);
+        factory.createMarket(
+            keccak256("underfunded bond"),
+            "ipfs://market-metadata",
+            block.timestamp + 1 days,
+            minBond - 1,
+            minLiquidity
+        );
+    }
+
+    function testCreateMarketRejectsBelowMinimumInitialLiquidity() public {
+        uint256 minBond = 5 * ONE_USDC;
+        uint256 minLiquidity = 10 * ONE_USDC;
+        _approveUSDC(creator, address(factory), minBond + minLiquidity);
+
+        vm.prank(creator);
+        vm.expectRevert(IknowMarketFactory.InvalidAmount.selector);
+        factory.createMarket(
+            keccak256("underfunded liquidity"),
+            "ipfs://market-metadata",
+            block.timestamp + 1 days,
+            minBond,
+            minLiquidity - 1
+        );
+    }
+
+    function testCreateMarketAcceptsExactCapitalMinimums() public {
+        uint256 minBond = 5 * ONE_USDC;
+        uint256 minLiquidity = 10 * ONE_USDC;
+        uint256 closeTime = block.timestamp + 1 days;
+        _approveUSDC(creator, address(factory), minBond + minLiquidity);
+
+        vm.prank(creator);
+        address marketAddr = factory.createMarket(
+            keccak256("exact minimum market"), "ipfs://market-metadata", closeTime, minBond, minLiquidity
+        );
+
+        IknowMarket market = IknowMarket(marketAddr);
+        (uint256 yesReserve, uint256 noReserve) = market.reserves();
+
+        require(market.creationBond() == minBond, "creation bond mismatch");
+        require(market.lpShares(creator) == minLiquidity, "creator LP shares mismatch");
+        require(yesReserve == minLiquidity, "YES reserve mismatch");
+        require(noReserve == minLiquidity, "NO reserve mismatch");
+        require(usdc.balanceOf(marketAddr) == minBond + minLiquidity, "market USDC mismatch");
     }
 
     function testFactoryMarketFullLifecycleHonorsChallengeWindow() public {

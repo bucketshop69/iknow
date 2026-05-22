@@ -2,7 +2,7 @@ export type Route =
   | { screen: "markets" }
   | { screen: "market"; marketId: string }
   | { screen: "create" }
-  | { screen: "portfolio" };
+  | { screen: "profile" };
 
 export type MarketStatus =
   | "Open"
@@ -62,6 +62,8 @@ export interface MarketReadModel {
   yesReserve: string;
   noReserve: string;
   volume24h: string;
+  imageUrl?: string;
+  sourceIdea?: MarketSourceIdeaReadModel;
 }
 
 export interface MarketUserState {
@@ -177,4 +179,39 @@ export interface CreateDraftInput {
   invalidConditions: string;
   creationBond: string;
   initialLiquidity: string;
+  imageUrl?: string;
+  sourceIdea?: MarketSourceIdeaReadModel;
+}
+
+export interface MarketSourceIdeaReadModel {
+  provider: string;
+  externalId: string;
+  url?: string;
+  imageUrl?: string;
+  question?: string;
+  closeTime?: string;
+}
+
+export interface MarketImportTag {
+  slug: string;
+  label: string;
+  id: number;
+}
+
+export interface MarketImportCandidate {
+  id: string;
+  externalId: string;
+  tagSlug: string;
+  tagLabel: string;
+  question: string;
+  closeTime: string;
+  resolutionSource: string;
+  invalidConditions: string[];
+  description: string;
+  imageUrl?: string;
+  sourceUrl?: string;
+  sourceProvider?: string;
+  liquidity?: string;
+  volume?: string;
+  volume24hr?: string;
 }

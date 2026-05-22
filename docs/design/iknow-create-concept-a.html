@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iknow create concept A</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f1ea;
+        --ink: #1d1b18;
+        --muted: #776f65;
+        --line: #ddd3c3;
+        --card: #fffdf8;
+        --card-2: #f9f4eb;
+        --nav-bg: rgba(255, 253, 248, 0.72);
+        --nav-active-text: #fffdf8;
+        --primary: #d8b85a;
+        --primary-ink: #211b09;
+        --yes: #6d9f63;
+        --yes-bg: #edf6e8;
+        --yes-line: #d3e7c9;
+        --no: #d9766d;
+        --no-bg: #fbebe9;
+        --no-line: #f0d1ce;
+        --receipt: #8f7d66;
+        --receipt-bg: #f1eadf;
+        --mascot-bg: #fff8e9;
+        --mascot-shadow: #d7c8ad;
+        --input-bg: #fffaf1;
+        --warm-clay: #c89f7d;
+        --warm-rust: #b86d58;
+        --olive: #7d8a62;
+        --shadow: 0 20px 55px rgba(69, 54, 35, 0.12);
+        --soft-shadow: 0 10px 30px rgba(69, 54, 35, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 15% 12%, rgba(216, 184, 90, 0.18), transparent 28%),
+          linear-gradient(180deg, rgba(255, 253, 248, 0.38), rgba(244, 241, 234, 0) 260px),
+          var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      textarea,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .theme-check {
+        position: fixed;
+        inline-size: 1px;
+        block-size: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .page {
+        min-height: 100vh;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 12%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 28%),
+          linear-gradient(180deg, color-mix(in srgb, var(--card) 38%, transparent), transparent 260px),
+          var(--bg);
+      }
+
+      .theme-check:checked ~ .page {
+        color-scheme: dark;
+        --bg: #1b1916;
+        --ink: #f4f1ea;
+        --muted: #b3aa9d;
+        --line: #403a33;
+        --card: #26231f;
+        --card-2: #302b25;
+        --nav-bg: rgba(38, 35, 31, 0.78);
+        --nav-active-text: #1d1b18;
+        --primary: #d9bd72;
+        --primary-ink: #211b09;
+        --yes: #b7c89c;
+        --yes-bg: #2c3226;
+        --yes-line: #444d3d;
+        --no: #d79a93;
+        --no-bg: #332725;
+        --no-line: #4f3834;
+        --receipt: #d1c3ad;
+        --receipt-bg: #342f28;
+        --mascot-bg: #efe3c9;
+        --mascot-shadow: #675b49;
+        --input-bg: #1f1c18;
+        --warm-clay: #c49b7b;
+        --warm-rust: #d18b75;
+        --olive: #a9b38b;
+        --shadow: 0 20px 55px rgba(0, 0, 0, 0.24);
+        --soft-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      }
+
+      .wrap,
+      .topbar {
+        width: min(1180px, calc(100% - 48px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        padding: 20px 0 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 180px;
+      }
+
+      .mascot {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px 14px 18px 18px;
+        background: var(--mascot-bg);
+        border: 2px solid var(--ink);
+        position: relative;
+        box-shadow: 5px 5px 0 var(--mascot-shadow);
+        flex: 0 0 auto;
+      }
+
+      .mascot::before,
+      .mascot::after {
+        content: "";
+        position: absolute;
+        top: 15px;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--ink);
+      }
+
+      .mascot::before {
+        left: 12px;
+      }
+
+      .mascot::after {
+        right: 12px;
+      }
+
+      .handle {
+        position: absolute;
+        right: -12px;
+        top: 13px;
+        width: 14px;
+        height: 16px;
+        border: 2px solid var(--ink);
+        border-left: 0;
+        border-radius: 0 10px 10px 0;
+      }
+
+      .smirk {
+        position: absolute;
+        left: 13px;
+        bottom: 11px;
+        width: 17px;
+        height: 7px;
+        border-bottom: 2px solid var(--ink);
+        border-radius: 0 0 20px 20px;
+        transform: rotate(-5deg);
+      }
+
+      .brand-text {
+        display: grid;
+        line-height: 1.1;
+      }
+
+      .brand-text strong {
+        font-size: 20px;
+      }
+
+      .brand-text span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nav {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        background: var(--nav-bg);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        backdrop-filter: blur(18px);
+      }
+
+      .nav button,
+      .wallet,
+      .theme-toggle {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        border-radius: 999px;
+        min-height: 36px;
+        padding: 0 14px;
+        font-weight: 800;
+      }
+
+      .nav button.active {
+        background: var(--ink);
+        color: var(--nav-active-text);
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .wallet,
+      .theme-toggle {
+        border: 1px solid var(--line);
+        background: var(--card);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        box-shadow: var(--soft-shadow);
+      }
+
+      .theme-toggle::before {
+        content: "Light";
+      }
+
+      .theme-check:checked ~ .page .theme-toggle::before {
+        content: "Dark";
+      }
+
+      .wrap {
+        padding: 20px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .studio,
+      .draft,
+      .research-strip,
+      .funding {
+        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--card) 94%, transparent);
+        box-shadow: var(--shadow);
+      }
+
+      .studio {
+        min-height: 585px;
+        border-radius: 28px;
+        padding: 26px;
+        display: grid;
+        align-content: space-between;
+        gap: 26px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .studio::after {
+        content: "";
+        position: absolute;
+        inset: auto 28px 28px auto;
+        width: 118px;
+        height: 118px;
+        border: 1px solid var(--line);
+        border-radius: 32px;
+        background:
+          linear-gradient(135deg, rgba(216, 184, 90, 0.2), transparent),
+          var(--card-2);
+        transform: rotate(-8deg);
+        opacity: 0.72;
+      }
+
+      .eyebrow {
+        color: var(--receipt);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      h1 {
+        margin: 10px 0 12px;
+        max-width: 720px;
+        font-size: clamp(42px, 7vw, 76px);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.5;
+        max-width: 660px;
+      }
+
+      .prompt-box {
+        position: relative;
+        z-index: 1;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--input-bg);
+        overflow: hidden;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 158px;
+        resize: none;
+        border: 0;
+        outline: 0;
+        color: var(--ink);
+        background: transparent;
+        padding: 22px 22px 10px;
+        font-size: 24px;
+        line-height: 1.25;
+        font-weight: 800;
+      }
+
+      textarea::placeholder {
+        color: color-mix(in srgb, var(--muted) 72%, transparent);
+      }
+
+      .prompt-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+        padding-left: 10px;
+      }
+
+      .primary-btn,
+      .secondary-btn {
+        border: 0;
+        min-height: 44px;
+        border-radius: 999px;
+        padding: 0 18px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .primary-btn {
+        background: var(--ink);
+        color: var(--nav-active-text);
+      }
+
+      .secondary-btn {
+        background: var(--primary);
+        color: var(--primary-ink);
+      }
+
+      .chips {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        background: var(--card-2);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 10px 13px;
+        font-size: 14px;
+        font-weight: 850;
+      }
+
+      .chip:nth-child(2) {
+        background: color-mix(in srgb, var(--warm-clay) 18%, var(--card-2));
+      }
+
+      .chip:nth-child(3) {
+        background: color-mix(in srgb, var(--olive) 18%, var(--card-2));
+      }
+
+      .side {
+        display: grid;
+        gap: 18px;
+      }
+
+      .research-strip {
+        border-radius: 24px;
+        padding: 18px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .research-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .research-head strong {
+        font-size: 17px;
+      }
+
+      .status-pill {
+        border-radius: 999px;
+        background: var(--receipt-bg);
+        color: var(--receipt);
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .steps {
+        display: grid;
+        gap: 9px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 22px 1fr;
+        gap: 10px;
+        align-items: start;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: var(--card-2);
+        border: 1px solid var(--line);
+      }
+
+      .dot::after {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+
+      .draft {
+        border-radius: 28px;
+        padding: 22px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .draft-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .draft-label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .confidence {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 10px;
+        background: var(--card-2);
+        font-size: 12px;
+        font-weight: 900;
+        color: var(--receipt);
+        white-space: nowrap;
+      }
+
+      .question {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .outcomes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .outcome {
+        border-radius: 18px;
+        border: 1px solid var(--yes-line);
+        background: var(--yes-bg);
+        padding: 14px;
+        display: grid;
+        gap: 5px;
+      }
+
+      .outcome.no {
+        border-color: var(--no-line);
+        background: var(--no-bg);
+      }
+
+      .outcome strong {
+        font-size: 22px;
+      }
+
+      .outcome span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.3;
+      }
+
+      .details {
+        display: grid;
+        gap: 10px;
+      }
+
+      .detail {
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        display: grid;
+        gap: 5px;
+      }
+
+      .detail strong {
+        font-size: 14px;
+      }
+
+      .detail p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      .funding {
+        margin-top: 18px;
+        border-radius: 28px;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .fund-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .fund-item {
+        border: 1px solid var(--line);
+        background: var(--card-2);
+        border-radius: 18px;
+        padding: 13px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .fund-item span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .fund-item strong {
+        font-size: 20px;
+      }
+
+      .create-action {
+        min-width: 190px;
+        min-height: 58px;
+        border-radius: 999px;
+        border: 0;
+        background: var(--primary);
+        color: var(--primary-ink);
+        font-weight: 950;
+        font-size: 17px;
+      }
+
+      @media (max-width: 940px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .studio {
+          min-height: auto;
+        }
+
+        .funding {
+          grid-template-columns: 1fr;
+        }
+
+        .create-action {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .wrap,
+        .topbar {
+          width: min(100% - 28px, 1180px);
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .brand {
+          min-width: 0;
+        }
+
+        .nav {
+          order: 3;
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .nav button {
+          flex: 1;
+          padding: 0 10px;
+        }
+
+        .wallet {
+          display: none;
+        }
+
+        h1 {
+          font-size: 44px;
+        }
+
+        textarea {
+          font-size: 20px;
+        }
+
+        .prompt-actions,
+        .draft-top {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .prompt-actions {
+          display: grid;
+        }
+
+        .hint {
+          padding-left: 0;
+        }
+
+        .primary-btn {
+          width: 100%;
+        }
+
+        .outcomes,
+        .fund-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .question {
+          font-size: 25px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <input class="theme-check" id="theme" type="checkbox" />
+    <div class="page">
+      <header class="topbar">
+        <div class="brand" aria-label="iknow">
+          <div class="mascot" aria-hidden="true">
+            <span class="handle"></span>
+            <span class="smirk"></span>
+          </div>
+          <div class="brand-text">
+            <strong>iknow</strong>
+            <span>smug markets, clean rules</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <button>Home</button>
+          <button class="active">Create</button>
+          <button>Profile</button>
+        </nav>
+
+        <div class="actions">
+          <label class="theme-toggle" for="theme" aria-label="Toggle theme"></label>
+          <button class="wallet">0x8f2...91c</button>
+        </div>
+      </header>
+
+      <main class="wrap">
+        <section class="hero" aria-label="Create a market">
+          <div class="studio">
+            <div>
+              <div class="eyebrow">Conversational Prompt Studio</div>
+              <h1>Say the market idea. iknow makes it useful.</h1>
+              <p class="lede">
+                Start messy, bold, or barely formed. The studio turns your intent into a clear question, checkable rules, and a market draft that sounds like it knows what it is doing.
+              </p>
+            </div>
+
+            <div class="prompt-box">
+              <textarea aria-label="Market idea">Will the next iPhone be announced before September 20?</textarea>
+              <div class="prompt-actions">
+                <span class="hint">iknow will tighten the wording, find the result source, and call out awkward edge cases.</span>
+                <button class="primary-btn">Build market draft</button>
+              </div>
+            </div>
+
+            <div class="chips" aria-label="Suggested market ideas">
+              <button class="chip">A celebrity breakup rumor, but actually resolvable</button>
+              <button class="chip">Will a local team win its next match?</button>
+              <button class="chip">Will a movie cross $1B worldwide?</button>
+              <button class="chip">Will a bill pass before summer recess?</button>
+            </div>
+          </div>
+
+          <aside class="side" aria-label="Research and draft">
+            <section class="research-strip" aria-label="Building state">
+              <div class="research-head">
+                <strong>iknow is doing the annoying part</strong>
+                <span class="status-pill">Researching</span>
+              </div>
+              <div class="steps">
+                <div class="step">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Reading your intent: launch timing, specific product, binary outcome.</span>
+                </div>
+                <div class="step">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Checking likely sources: Apple Newsroom, event page, official press release.</span>
+                </div>
+                <div class="step">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Drafting rules so the market does not become a vibes tribunal. You are welcome.</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="draft" aria-label="Selected market draft">
+              <div class="draft-top">
+                <div>
+                  <div class="draft-label">Selected market</div>
+                  <h2 class="question">Will Apple announce the next iPhone before September 20, 2026?</h2>
+                </div>
+                <span class="confidence">Good shape</span>
+              </div>
+
+              <p class="summary">
+                This market resolves based on an official Apple announcement of the next mainline iPhone generation before 11:59 PM Pacific Time on September 19, 2026.
+              </p>
+
+              <div class="outcomes">
+                <div class="outcome">
+                  <strong>Yes</strong>
+                  <span>Apple officially announces the next mainline iPhone generation before the deadline.</span>
+                </div>
+                <div class="outcome no">
+                  <strong>No</strong>
+                  <span>No qualifying official announcement appears before the deadline.</span>
+                </div>
+              </div>
+
+              <div class="details">
+                <div class="detail">
+                  <strong>Where to check the result</strong>
+                  <p>Apple Newsroom, apple.com event pages, or Apple verified social channels if they link to the announcement.</p>
+                </div>
+                <div class="detail">
+                  <strong>Rules</strong>
+                  <p>Rumors, analyst notes, carrier leaks, store listings, and accessory references do not count. The announcement must name the next mainline iPhone generation.</p>
+                </div>
+                <div class="detail">
+                  <strong>Invalid conditions</strong>
+                  <p>Resolve invalid only if official Apple sources are unavailable for the full review window or the question becomes impossible to interpret.</p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+
+        <section class="funding" aria-label="Fund and create">
+          <div class="fund-grid">
+            <div class="fund-item">
+              <span>Money to start the market</span>
+              <strong>$250</strong>
+            </div>
+            <div class="fund-item">
+              <span>Safety deposit</span>
+              <strong>$50</strong>
+            </div>
+            <div class="fund-item">
+              <span>Review window</span>
+              <strong>24h</strong>
+            </div>
+          </div>
+          <button class="create-action">Fund and create</button>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

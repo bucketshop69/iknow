@@ -104,6 +104,55 @@ test("prepares and stores local evidence packets for market detail", async () =>
   assert.deepEqual(await readResponse.json(), prepared);
 });
 
+test("prepares Binance candle evidence for price markets", async () => {
+  resetEvidencePacketStoreForTests();
+  const originalFetch = globalThis.fetch;
+  const start = "2026-05-22T03:00:00.000Z";
+  const close = "2026-05-22T04:00:00.000Z";
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    assert.equal(url.hostname, "api.binance.com");
+    assert.equal(url.searchParams.get("symbol"), "SOLUSDT");
+    assert.equal(url.searchParams.get("interval"), "1m");
+
+    return new Response(
+      JSON.stringify([
+        [Date.parse(start), "87.00", "87.50", "86.90", "87.10", "100", Date.parse(start) + 60_000, "0", 1, "0", "0", "0"],
+        [Date.parse(close) - 60_000, "87.70", "88.01", "87.60", "87.90", "100", Date.parse(close), "0", 1, "0", "0", "0"],
+      ]),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+
+  try {
+    const prepareResponse = await app.request("/evidence/prepare", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        actorId: "resolver",
+        marketId: "solana-88-demo",
+        marketAddress: "0x0000000000000000000000000000000000000001",
+        question: "Will Solana trade at or above $88 in the next hour?",
+        closeTime: close,
+        resolutionSource: `Binance SOL/USDT 1-minute candles. Market window: ${start} to ${close}.`,
+        invalidConditions: ["Resolve Invalid only if Binance SOL/USDT 1-minute candle data is unavailable."],
+      }),
+    });
+
+    assert.equal(prepareResponse.status, 201);
+    const prepared = await prepareResponse.json();
+
+    assert.equal(prepared.packet.suggestedOutcome, "YES");
+    assert.equal(prepared.packet.agentId, "iknow-api-binance-candle-resolver");
+    assert.equal(prepared.packet.evidenceLinks[0].publisher, "Binance");
+    assert.match(prepared.packet.extractedFacts[0].claim, /maximum 1-minute candle high was 88.01/);
+    assert.equal(prepared.packet.invalidChecks[0].status, "PASSED");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rejects evidence packets missing required evidence", async () => {
   resetEvidencePacketStoreForTests();
 

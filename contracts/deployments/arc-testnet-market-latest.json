@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "creator": "0xc9BEbdb206959E28E608863f15fEaAc1254551CF",
+  "factory": "0x023290ce90BbB56160d847a3124B60743d213719",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "market": "0xcbBf1B7035A1560383e21aB684A7DD7d40f5605B",
+  "id": "arc-smoke-test",
+  "question": "Will this Arc testnet smoke market resolve YES?",
+  "metadataURI": "urn:iknow:market:arc-smoke-test",
+  "resolutionSource": "Manual smoke-test source controlled by the iknow demo resolver.",
+  "invalidCondition": "Resolve INVALID only if the test market was created with malformed metadata.",
+  "specHash": "0x650e7ff77c50d09442df3b360c31d53996046c6ea60ffb62a0e4178c9461f350",
+  "closeTime": 1779451227,
+  "creationBond": "5000000",
+  "initialLiquidity": "10000000",
+  "smokeBuy": "1000000",
+  "yesReserve": "9093390",
+  "noReserve": "10997000",
+  "yesTokenId": "56943764493574353308075556131873563367598742151235724067817575410364045940717",
+  "noTokenId": "105530304974146273377031955993531068997362033177102049160638293462039931354880"
+}

@@ -3,8 +3,15 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { readLocalDeployment } from "./deployment.js";
+import {
+  readLocalDeployment,
+  readTestnetDeployment,
+  refreshTestnetDeploymentMarkets,
+  upsertLocalDeploymentMarket,
+  upsertTestnetDeploymentMarket,
+} from "./deployment.js";
 import { createEvidencePacketResponse, prepareEvidencePacketResponse, readEvidencePacketResponse } from "./evidence.js";
+import { MARKET_IMPORT_TAGS, listMarketImportCandidates } from "./marketImport.js";
 import { createMarketDraftResponse } from "./marketDraft.js";
 
 export const app = new Hono();
@@ -17,7 +24,41 @@ app.get("/health", (c) => {
 
 app.post("/markets/draft", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(createMarketDraftResponse(body));
+  try {
+    return c.json(createMarketDraftResponse(body));
+  } catch (error) {
+    return c.json(
+      {
+        error: "INVALID_MARKET_DRAFT",
+        message: error instanceof Error ? error.message : "Market draft is invalid",
+      },
+      400,
+    );
+  }
+});
+
+app.get("/market-import/tags", (c) => {
+  return c.json({ tags: MARKET_IMPORT_TAGS });
+});
+
+app.get("/market-import/candidates", async (c) => {
+  try {
+    const candidates = await listMarketImportCandidates({
+      tagSlug: c.req.query("tag") ?? undefined,
+      query: c.req.query("q") ?? "",
+      limit: Number(c.req.query("limit") ?? 24),
+    });
+
+    return c.json({ candidates });
+  } catch (error) {
+    return c.json(
+      {
+        error: "MARKET_IMPORT_UNAVAILABLE",
+        message: error instanceof Error ? error.message : "Unable to fetch market ideas",
+      },
+      502,
+    );
+  }
 });
 
 app.post("/local/evidence", async (c) => {
@@ -56,7 +97,7 @@ app.post("/evidence/prepare", async (c) => {
   const body = await c.req.json().catch(() => ({}));
 
   try {
-    return c.json(prepareEvidencePacketResponse(body), 201);
+    return c.json(await prepareEvidencePacketResponse(body), 201);
   } catch (error) {
     return c.json(
       {
@@ -164,6 +205,110 @@ app.get("/local/deployment", async (c) => {
         message: error instanceof Error ? error.message : "Unable to read local deployment artifact",
       },
       503,
+    );
+  }
+});
+
+app.post("/local/deployment/markets", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+
+  try {
+    const deployment = await upsertLocalDeploymentMarket(body.market);
+
+    return c.json({ market: deployment.markets[0], deployment }, 201);
+  } catch (error) {
+    return c.json(
+      {
+        error: "LOCAL_MARKET_PERSIST_FAILED",
+        message: error instanceof Error ? error.message : "Unable to persist local market",
+      },
+      400,
+    );
+  }
+});
+
+app.get("/testnet/deployment", async (c) => {
+  try {
+    const shouldRefresh =
+      c.req.query("refresh") !== "false" && process.env.IKNOW_TESTNET_INDEX_ON_READ !== "false";
+
+    if (!shouldRefresh) {
+      return c.json(await readTestnetDeployment());
+    }
+
+    try {
+      const result = await refreshTestnetDeploymentMarkets();
+
+      return c.json({
+        ...result.deployment,
+        indexing: {
+          status: "fresh",
+          indexed: result.indexed,
+          added: result.added,
+          updated: result.updated,
+        },
+      });
+    } catch (indexError) {
+      return c.json({
+        ...(await readTestnetDeployment()),
+        indexing: {
+          status: "stale",
+          error: indexError instanceof Error ? indexError.message : "Unable to refresh Arc testnet market index",
+        },
+      });
+    }
+  } catch (error) {
+    return c.json(
+      {
+        error: "TESTNET_DEPLOYMENT_NOT_READY",
+        message: error instanceof Error ? error.message : "Unable to read Arc testnet deployment artifact",
+      },
+      503,
+    );
+  }
+});
+
+app.post("/testnet/deployment/index", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+
+  try {
+    const result = await refreshTestnetDeploymentMarkets({
+      fromBlock:
+        typeof body.fromBlock === "string" || typeof body.fromBlock === "number" ? BigInt(body.fromBlock) : undefined,
+      toBlock: typeof body.toBlock === "string" || typeof body.toBlock === "number" ? BigInt(body.toBlock) : undefined,
+    });
+
+    return c.json({
+      indexed: result.indexed,
+      added: result.added,
+      updated: result.updated,
+      deployment: result.deployment,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: "TESTNET_MARKET_INDEX_FAILED",
+        message: error instanceof Error ? error.message : "Unable to index Arc testnet markets",
+      },
+      502,
+    );
+  }
+});
+
+app.post("/testnet/deployment/markets", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+
+  try {
+    const deployment = await upsertTestnetDeploymentMarket(body.market);
+
+    return c.json({ market: deployment.markets[0], deployment }, 201);
+  } catch (error) {
+    return c.json(
+      {
+        error: "TESTNET_MARKET_PERSIST_FAILED",
+        message: error instanceof Error ? error.message : "Unable to persist Arc testnet market",
+      },
+      400,
     );
   }
 });

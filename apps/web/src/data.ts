@@ -1,5 +1,8 @@
 import {
+  CREATE_MIN_CREATION_BOND_USDC,
+  CREATE_MIN_INITIAL_LIQUIDITY_USDC,
   arcTestnet,
+  deployedMarketSchema,
   localDeploymentSchema,
   marketDraftResponseSchema,
   marketDraftSchema,
@@ -26,6 +29,7 @@ import {
   parseUnits,
   toHex,
   type Hex,
+  type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type {
@@ -41,12 +45,51 @@ import type {
   MarketLifecycleReadback,
   MarketUserState,
   MarketReadModel,
+  MarketSourceIdeaReadModel,
   PortfolioReadModel,
 } from "./types";
 
+const CREATE_MIN_CREATION_BOND_UNITS = parseUnits(CREATE_MIN_CREATION_BOND_USDC, 6);
+const CREATE_MIN_INITIAL_LIQUIDITY_UNITS = parseUnits(CREATE_MIN_INITIAL_LIQUIDITY_USDC, 6);
+
 type AbiEntry = { type?: string; name?: string };
+export type ChainRuntimeMode = "local" | "arc-testnet";
+
+export interface AppDeployment {
+  schemaVersion: 1;
+  generatedAtBlockTimestamp: number;
+  chain: {
+    id: number;
+    name: string;
+    rpcUrl: string;
+  };
+  contracts: {
+    usdc: {
+      address: Address;
+      decimals: number;
+    };
+    outcomeToken: {
+      address: Address;
+    };
+    iknowMarketFactory: {
+      address: Address;
+      defaultChallengeWindow?: number;
+    };
+  };
+  actors?: Record<string, { address: Address; privateKey?: Hex } | Address>;
+  markets: DeployedMarket[];
+  mode: ChainRuntimeMode;
+}
+
+export interface ConnectedWalletRuntime {
+  address?: Address;
+  chainId?: number;
+  walletClient?: WalletClient;
+}
 
 export const apiBaseUrl = import.meta.env.VITE_IKNOW_API_URL ?? "http://127.0.0.1:8787";
+export const chainRuntimeMode: ChainRuntimeMode =
+  import.meta.env.VITE_IKNOW_CHAIN_MODE === "local" ? "local" : "arc-testnet";
 
 const addressOrUndefined = (value: unknown): Address | undefined => {
   if (typeof value !== "string" || !value.startsWith("0x")) {
@@ -73,15 +116,144 @@ export async function loadLocalDeployment(): Promise<LocalDeployment | null> {
   return localDeploymentSchema.parse(await response.json());
 }
 
-export const contractSurface = (deployment: LocalDeployment | null): ContractSurface => {
+export async function loadAppDeployment(): Promise<AppDeployment | null> {
+  if (chainRuntimeMode === "local") {
+    const localDeployment = await loadLocalDeployment();
+    return localDeployment ? normalizeLocalDeployment(localDeployment) : null;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/testnet/deployment`);
+  if (!response.ok) {
+    return fallbackArcDeployment();
+  }
+
+  return normalizeArcDeployment(await response.json());
+}
+
+function normalizeLocalDeployment(deployment: LocalDeployment): AppDeployment {
+  return {
+    schemaVersion: deployment.schemaVersion,
+    generatedAtBlockTimestamp: deployment.generatedAtBlockTimestamp,
+    chain: deployment.chain,
+    contracts: {
+      usdc: {
+        address: deployment.contracts.mockUSDC.address as Address,
+        decimals: deployment.contracts.mockUSDC.decimals,
+      },
+      outcomeToken: {
+        address: deployment.contracts.outcomeToken.address as Address,
+      },
+      iknowMarketFactory: {
+        address: deployment.contracts.iknowMarketFactory.address as Address,
+      },
+    },
+    actors: deployment.actors as AppDeployment["actors"],
+    markets: deployment.markets,
+    mode: "local",
+  };
+}
+
+function normalizeArcDeployment(raw: unknown): AppDeployment | null {
+  const candidate = raw as {
+    schemaVersion?: number;
+    generatedAtBlockTimestamp?: number;
+    chain?: { id?: number; name?: string; rpcUrl?: string };
+    contracts?: {
+      usdc?: { address?: string; decimals?: number };
+      outcomeToken?: { address?: string };
+      iknowMarketFactory?: { address?: string; defaultChallengeWindow?: number };
+    };
+    actors?: Record<string, string>;
+    markets?: unknown[];
+  };
+  const marketFactory = addressOrUndefined(candidate.contracts?.iknowMarketFactory?.address);
+  const outcomeToken = addressOrUndefined(candidate.contracts?.outcomeToken?.address);
+  const usdc = addressOrUndefined(candidate.contracts?.usdc?.address);
+
+  if (!marketFactory || !outcomeToken || !usdc) {
+    return fallbackArcDeployment();
+  }
+
+  return {
+    schemaVersion: 1,
+    generatedAtBlockTimestamp:
+      typeof candidate.generatedAtBlockTimestamp === "number"
+        ? candidate.generatedAtBlockTimestamp
+        : Math.floor(Date.now() / 1000),
+    chain: {
+      id: candidate.chain?.id ?? arcTestnet.id,
+      name: candidate.chain?.name ?? arcTestnet.name,
+      rpcUrl: candidate.chain?.rpcUrl ?? arcTestnet.rpcUrl,
+    },
+    contracts: {
+      usdc: {
+        address: usdc,
+        decimals: candidate.contracts?.usdc?.decimals ?? 6,
+      },
+      outcomeToken: {
+        address: outcomeToken,
+      },
+      iknowMarketFactory: {
+        address: marketFactory,
+        defaultChallengeWindow: candidate.contracts?.iknowMarketFactory?.defaultChallengeWindow,
+      },
+    },
+    actors: Object.fromEntries(
+      Object.entries(candidate.actors ?? {}).flatMap(([id, address]) => {
+        const normalized = addressOrUndefined(address);
+        return normalized ? [[id, normalized]] : [];
+      }),
+    ),
+    markets: (candidate.markets ?? []).flatMap((market) => {
+      const parsed = deployedMarketSchema.safeParse(market);
+      return parsed.success ? [parsed.data] : [];
+    }),
+    mode: "arc-testnet",
+  };
+}
+
+function fallbackArcDeployment(): AppDeployment | null {
+  const marketFactory = addressOrUndefined(deployedAddresses.arcTestnet.marketFactory);
+  const outcomeToken = addressOrUndefined(deployedAddresses.arcTestnet.outcomeToken);
+  if (!marketFactory || !outcomeToken) {
+    return null;
+  }
+
+  return {
+    schemaVersion: 1,
+    generatedAtBlockTimestamp: Math.floor(Date.now() / 1000),
+    chain: {
+      id: arcTestnet.id,
+      name: arcTestnet.name,
+      rpcUrl: arcTestnet.rpcUrl,
+    },
+    contracts: {
+      usdc: {
+        address: "0x3600000000000000000000000000000000000000",
+        decimals: 6,
+      },
+      outcomeToken: {
+        address: outcomeToken,
+      },
+      iknowMarketFactory: {
+        address: marketFactory,
+      },
+    },
+    actors: {},
+    markets: [],
+    mode: "arc-testnet",
+  };
+}
+
+export const contractSurface = (deployment: AppDeployment | null): ContractSurface => {
   if (deployment) {
     return {
       chainId: deployment.chain.id,
       chainName: deployment.chain.name,
       rpcUrl: deployment.chain.rpcUrl,
-      explorerUrl: "",
-      marketFactory: deployment.contracts.iknowMarketFactory.address as Address,
-      outcomeToken: deployment.contracts.outcomeToken.address as Address,
+      explorerUrl: deployment.mode === "arc-testnet" ? arcTestnet.explorerUrl : "",
+      marketFactory: deployment.contracts.iknowMarketFactory.address,
+      outcomeToken: deployment.contracts.outcomeToken.address,
       abiSummary: abiSummary(),
     };
   }
@@ -136,7 +308,7 @@ export const fallbackDevActors: DevActor[] = [
   },
 ];
 
-const actorLabels: Record<keyof LocalDeployment["actors"], { name: string; role: DevActorRole; usdcBalance: string }> = {
+const actorLabels: Record<string, { name: string; role: DevActorRole; usdcBalance: string }> = {
   deployer: { name: "Deployer", role: "Deployer", usdcBalance: "MockUSDC minter" },
   creator: { name: "Creator", role: "Creator", usdcBalance: "100,000 seeded" },
   traderYes: { name: "TraderYes", role: "TraderYes", usdcBalance: "25,000 seeded" },
@@ -146,15 +318,27 @@ const actorLabels: Record<keyof LocalDeployment["actors"], { name: string; role:
   protocol: { name: "Protocol", role: "Protocol", usdcBalance: "Fee recipient" },
 };
 
-export function devActorsFromDeployment(deployment: LocalDeployment | null): DevActor[] {
+export function devActorsFromDeployment(deployment: AppDeployment | null, walletAddress?: Address): DevActor[] {
   if (!deployment) {
     return fallbackDevActors;
   }
 
-  return Object.entries(deployment.actors).map(([id, actor]) => ({
+  if (deployment.mode === "arc-testnet") {
+    return [
+      {
+        id: "wallet",
+        name: walletAddress ? "Wallet" : "Connect wallet",
+        role: "Creator",
+        address: walletAddress ?? "0x0000000000000000000000000000000000000000",
+        usdcBalance: "Arc Testnet",
+      },
+    ];
+  }
+
+  return Object.entries(deployment.actors ?? {}).map(([id, actor]) => ({
     id,
-    address: actor.address as Address,
-    ...actorLabels[id as keyof LocalDeployment["actors"]],
+    address: actorAddress(actor),
+    ...(actorLabels[id] ?? { name: id, role: "Creator" as DevActorRole, usdcBalance: "Local actor" }),
   }));
 }
 
@@ -179,7 +363,7 @@ const fallbackMarkets: MarketReadModel[] = [
   },
 ];
 
-export function marketsFromDeployment(deployment: LocalDeployment | null): MarketReadModel[] {
+export function marketsFromDeployment(deployment: AppDeployment | null): MarketReadModel[] {
   if (!deployment) {
     return fallbackMarkets;
   }
@@ -194,6 +378,8 @@ export function marketsFromDeployment(deployment: LocalDeployment | null): Marke
     invalidConditions: market.invalidConditions ?? ["Local demo market metadata is unavailable."],
     metadataURI: market.metadataURI,
     specHash: market.specHash as `0x${string}`,
+    imageUrl: market.imageUrl,
+    sourceIdea: market.sourceIdea,
     creator: "Creator",
     yesPrice: index === 0 ? 0.5 : 0.5,
     noPrice: index === 0 ? 0.5 : 0.5,
@@ -218,7 +404,11 @@ export interface MarketDataSource {
     amount: string,
     slippageBps: number,
   ) => Promise<TradeQuoteReadback>;
-  executeCreateMarket: (actorId: string, draft: MarketDraftResponse) => Promise<MarketCreationResult>;
+  executeCreateMarket: (
+    actorId: string,
+    draft: MarketDraftResponse,
+    sourceMetadata?: CreateMarketSourceMetadata,
+  ) => Promise<MarketCreationResult>;
   executeBuy: (
     actorId: string,
     marketId: string,
@@ -260,6 +450,11 @@ export interface MarketCreationResult {
   market: DeployedMarket;
 }
 
+export interface CreateMarketSourceMetadata {
+  imageUrl?: string;
+  sourceIdea?: MarketSourceIdeaReadModel;
+}
+
 export type TradeAction = "BUY_YES" | "BUY_NO" | "SELL_YES" | "SELL_NO";
 export type ResolutionOutcomeInput = "YES" | "NO" | "INVALID";
 
@@ -275,7 +470,11 @@ export interface TradeQuoteReadback {
   slippageBps: number;
 }
 
-export function createMarketDataSource(deployment: LocalDeployment | null, actors: DevActor[]): MarketDataSource {
+export function createMarketDataSource(
+  deployment: AppDeployment | null,
+  actors: DevActor[],
+  wallet?: ConnectedWalletRuntime,
+): MarketDataSource {
   const markets = marketsFromDeployment(deployment);
 
   return {
@@ -326,27 +525,28 @@ export function createMarketDataSource(deployment: LocalDeployment | null, actor
     readEvidencePacket,
     buildTradeQuote: (marketId, action, amount, slippageBps) =>
       buildTradeQuote(deployment, marketId, action, amount, slippageBps),
-    executeCreateMarket: (actorId, draft) => executeCreateMarket(deployment, actorId, draft),
+    executeCreateMarket: (actorId, draft, sourceMetadata) =>
+      executeCreateMarket(deployment, actorId, draft, sourceMetadata, wallet),
     executeBuy: (actorId, marketId, side, usdcAmount, slippageBps) =>
-      executeBuy(deployment, actorId, marketId, side, usdcAmount, slippageBps),
+      executeBuy(deployment, actorId, marketId, side, usdcAmount, slippageBps, wallet),
     executeSell: (actorId, marketId, side, outcomeAmount, slippageBps) =>
-      executeSell(deployment, actorId, marketId, side, outcomeAmount, slippageBps),
+      executeSell(deployment, actorId, marketId, side, outcomeAmount, slippageBps, wallet),
     executeAddLiquidity: (actorId, marketId, usdcAmount) =>
-      executeAddLiquidity(deployment, actorId, marketId, usdcAmount),
+      executeAddLiquidity(deployment, actorId, marketId, usdcAmount, wallet),
     executeRemoveLiquidity: (actorId, marketId, lpShares) =>
-      executeRemoveLiquidity(deployment, actorId, marketId, lpShares),
+      executeRemoveLiquidity(deployment, actorId, marketId, lpShares, wallet),
     readMarketUserState: (actorId, marketId) => readMarketUserState(deployment, actors, markets, actorId, marketId),
     readMarketLifecycle: (actorId, marketId) => readMarketLifecycle(deployment, actors, actorId, marketId),
     readLpPosition: (actorId, marketId) => readLpPosition(deployment, actors, markets, actorId, marketId),
     readLpPortfolio: (actorId) => readLpPortfolio(deployment, actors, markets, actorId),
-    executeCloseMarket: (actorId, marketId) => executeCloseMarket(deployment, actorId, marketId),
+    executeCloseMarket: (actorId, marketId) => executeCloseMarket(deployment, actorId, marketId, wallet),
     executeProposeResolution: (actorId, marketId, outcome, evidenceURI) =>
-      executeProposeResolution(deployment, actorId, marketId, outcome, evidenceURI),
-    executeFinalizeResolution: (actorId, marketId) => executeFinalizeResolution(deployment, actorId, marketId),
-    executeRedeem: (actorId, marketId) => executeRedeem(deployment, actorId, marketId),
-    executeClaimCreatorFees: (actorId, marketId) => executeClaimCreatorFees(deployment, actorId, marketId),
-    executeClaimProtocolFees: (actorId, marketId) => executeClaimProtocolFees(deployment, actorId, marketId),
-    executeClaimCreationBond: (actorId, marketId) => executeClaimCreationBond(deployment, actorId, marketId),
+      executeProposeResolution(deployment, actorId, marketId, outcome, evidenceURI, wallet),
+    executeFinalizeResolution: (actorId, marketId) => executeFinalizeResolution(deployment, actorId, marketId, wallet),
+    executeRedeem: (actorId, marketId) => executeRedeem(deployment, actorId, marketId, wallet),
+    executeClaimCreatorFees: (actorId, marketId) => executeClaimCreatorFees(deployment, actorId, marketId, wallet),
+    executeClaimProtocolFees: (actorId, marketId) => executeClaimProtocolFees(deployment, actorId, marketId, wallet),
+    executeClaimCreationBond: (actorId, marketId) => executeClaimCreationBond(deployment, actorId, marketId, wallet),
     executeWarpToClose: (marketId) => executeWarpToClose(deployment, marketId),
     executeWarpChallengeWindow: (marketId) => executeWarpChallengeWindow(deployment, marketId),
   };
@@ -358,50 +558,127 @@ const outcomeApprovalAbi = parseAbi([
   "function setApprovalForAll(address operator,bool approved)",
 ]);
 
-function requireDeployment(deployment: LocalDeployment | null): LocalDeployment {
+function requireDeployment(deployment: AppDeployment | null): AppDeployment {
   if (!deployment) {
-    throw new Error("Local deployment is not loaded. Run pnpm chain:anvil, pnpm chain:deploy, and pnpm dev:api.");
+    throw new Error(
+      chainRuntimeMode === "arc-testnet"
+        ? "Arc testnet deployment is not loaded. Run pnpm dev:api and check contracts/deployments/arc-testnet.json."
+        : "Local deployment is not loaded. Run pnpm chain:anvil, pnpm chain:deploy, and pnpm dev:api.",
+    );
   }
 
   return deployment;
 }
 
-function actorAccount(deployment: LocalDeployment, actorId: string) {
-  const actor = deployment.actors[actorId as keyof LocalDeployment["actors"]];
-  if (!actor) {
+function actorAddress(actor: { address: Address; privateKey?: Hex } | Address): Address {
+  return typeof actor === "string" ? actor : actor.address;
+}
+
+function actorPrivateKey(actor: { address: Address; privateKey?: Hex } | Address): Hex | undefined {
+  return typeof actor === "string" ? undefined : actor.privateKey;
+}
+
+function actorAccount(deployment: AppDeployment, actorId: string) {
+  const actor = deployment.actors?.[actorId];
+  const privateKey = actor ? actorPrivateKey(actor) : undefined;
+  if (!privateKey) {
     throw new Error(`Unknown local actor: ${actorId}`);
   }
 
-  return privateKeyToAccount(actor.privateKey as Hex);
+  return privateKeyToAccount(privateKey);
 }
 
-function localChain(deployment: LocalDeployment) {
+function chainForDeployment(deployment: AppDeployment) {
   return {
     id: deployment.chain.id,
     name: deployment.chain.name,
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    nativeCurrency:
+      deployment.mode === "arc-testnet" ? arcTestnet.nativeCurrency : { name: "Ether", symbol: "ETH", decimals: 18 },
     rpcUrls: { default: { http: [deployment.chain.rpcUrl] } },
   } as const;
 }
 
-function clients(deployment: LocalDeployment, actorId: string) {
-  const chain = localChain(deployment);
+function publicClientFor(deployment: AppDeployment) {
+  return createPublicClient({ chain: chainForDeployment(deployment), transport: http(deployment.chain.rpcUrl) });
+}
+
+function localClients(deployment: AppDeployment, actorId: string) {
+  if (deployment.mode !== "local") {
+    throw new Error("Local dev actor signing is disabled on Arc Testnet. Connect a wallet to sign this transaction.");
+  }
+  const chain = chainForDeployment(deployment);
+  const account = actorAccount(deployment, actorId);
   return {
-    publicClient: createPublicClient({ chain, transport: http(deployment.chain.rpcUrl) }),
+    publicClient: publicClientFor(deployment),
     walletClient: createWalletClient({
-      account: actorAccount(deployment, actorId),
+      account,
       chain,
       transport: http(deployment.chain.rpcUrl),
     }),
+    account,
   };
 }
 
-async function waitForSuccess(deployment: LocalDeployment, hash: Hex) {
-  const publicClient = createPublicClient({
-    chain: localChain(deployment),
-    transport: http(deployment.chain.rpcUrl),
-  });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+function connectedWriter(deployment: AppDeployment, actorId: string, wallet?: ConnectedWalletRuntime) {
+  if (deployment.mode === "local") {
+    const { walletClient, account } = localClients(deployment, actorId);
+    return { walletClient, account };
+  }
+
+  if (!wallet?.address) {
+    throw new Error("Connect your wallet before sending this Arc Testnet transaction.");
+  }
+
+  if (!wallet.walletClient) {
+    throw new Error("Wallet is connected, but the signer is not ready yet. Wait a moment, then try again.");
+  }
+
+  if (wallet.chainId && wallet.chainId !== deployment.chain.id) {
+    throw new Error(`Switch your wallet to ${deployment.chain.name} before sending this transaction.`);
+  }
+
+  return { walletClient: wallet.walletClient, account: wallet.address };
+}
+
+async function writeContractUnchecked(walletClient: WalletClient, parameters: Record<string, unknown>): Promise<Hex> {
+  return (walletClient.writeContract as (request: unknown) => Promise<Hex>)(parameters);
+}
+
+function actorReadAddress(deployment: AppDeployment, actors: DevActor[], actorId: string): Address {
+  const actor = actors.find((candidate) => candidate.id === actorId);
+  if (actor) {
+    return actor.address;
+  }
+
+  const deploymentActor = deployment.actors?.[actorId];
+  if (deploymentActor) {
+    return actorAddress(deploymentActor);
+  }
+
+  return "0x0000000000000000000000000000000000000000";
+}
+
+function actorIsResolver(deployment: AppDeployment, actor: DevActor | undefined, actorAddressValue: Address) {
+  const resolver = deployment.actors?.resolver;
+  return (
+    actor?.role === "Resolver" ||
+    Boolean(resolver && actorAddress(resolver).toLowerCase() === actorAddressValue.toLowerCase())
+  );
+}
+
+function recipientFor(deployment: AppDeployment, actorId: string, wallet?: ConnectedWalletRuntime): Address {
+  if (deployment.mode === "arc-testnet") {
+    if (!wallet?.address) {
+      throw new Error("Connect your wallet before claiming funds on Arc Testnet.");
+    }
+    return wallet.address;
+  }
+
+  return actorAccount(deployment, actorId).address;
+}
+
+async function waitForSuccess(deployment: AppDeployment, hash: Hex) {
+  const receipt = await publicClientFor(deployment).waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") {
     throw new Error(`Transaction failed: ${hash}`);
   }
@@ -409,10 +686,17 @@ async function waitForSuccess(deployment: LocalDeployment, hash: Hex) {
   return receipt;
 }
 
-async function approveUsdc(deployment: LocalDeployment, actorId: string, spender: Address, amount: bigint) {
-  const { walletClient } = clients(deployment, actorId);
-  const hash = await walletClient.writeContract({
-    address: deployment.contracts.mockUSDC.address as Address,
+async function approveUsdc(
+  deployment: AppDeployment,
+  actorId: string,
+  spender: Address,
+  amount: bigint,
+  wallet?: ConnectedWalletRuntime,
+) {
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
+    address: deployment.contracts.usdc.address,
     abi: erc20Abi,
     functionName: "approve",
     args: [spender, amount],
@@ -420,22 +704,29 @@ async function approveUsdc(deployment: LocalDeployment, actorId: string, spender
   await waitForSuccess(deployment, hash);
 }
 
-async function approveOutcomeSpender(deployment: LocalDeployment, actorId: string, spender: Address) {
-  const { publicClient, walletClient } = clients(deployment, actorId);
-  const account = actorAccount(deployment, actorId);
+async function approveOutcomeSpender(
+  deployment: AppDeployment,
+  actorId: string,
+  spender: Address,
+  wallet?: ConnectedWalletRuntime,
+) {
+  const publicClient = publicClientFor(deployment);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const owner = typeof account === "string" ? account : account.address;
   const approved = await publicClient.readContract({
-    address: deployment.contracts.outcomeToken.address as Address,
+    address: deployment.contracts.outcomeToken.address,
     abi: outcomeApprovalAbi,
     functionName: "isApprovedForAll",
-    args: [account.address, spender],
+    args: [owner, spender],
   });
 
   if (approved) {
     return;
   }
 
-  const hash = await walletClient.writeContract({
-    address: deployment.contracts.outcomeToken.address as Address,
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
+    address: deployment.contracts.outcomeToken.address,
     abi: outcomeApprovalAbi,
     functionName: "setApprovalForAll",
     args: [spender, true],
@@ -443,8 +734,8 @@ async function approveOutcomeSpender(deployment: LocalDeployment, actorId: strin
   await waitForSuccess(deployment, hash);
 }
 
-function parseTradeAmount(deployment: LocalDeployment, amount: string) {
-  const parsed = parseUnits(amount || "0", deployment.contracts.mockUSDC.decimals);
+function parseTradeAmount(deployment: AppDeployment, amount: string) {
+  const parsed = parseUnits(amount || "0", deployment.contracts.usdc.decimals);
   if (parsed <= 0n) {
     throw new Error("Amount must be greater than zero");
   }
@@ -464,8 +755,8 @@ function minOutForSlippage(amountOut: bigint, slippageBps?: number) {
   return (amountOut * BigInt(10_000 - boundedSlippageBps(slippageBps))) / 10_000n;
 }
 
-function tokenAmountLabel(deployment: LocalDeployment, amount: bigint, symbol: string) {
-  return `${displayUnits(amount, deployment.contracts.mockUSDC.decimals)} ${symbol}`;
+function tokenAmountLabel(deployment: AppDeployment, amount: bigint, symbol: string) {
+  return `${displayUnits(amount, deployment.contracts.usdc.decimals)} ${symbol}`;
 }
 
 function priceFromReserves(yesReserve: bigint, noReserve: bigint) {
@@ -478,10 +769,10 @@ function priceFromReserves(yesReserve: bigint, noReserve: bigint) {
   return { yesPrice, noPrice: 1 - yesPrice };
 }
 
-async function readMarkets(maybeDeployment: LocalDeployment | null): Promise<MarketReadModel[]> {
+async function readMarkets(maybeDeployment: AppDeployment | null): Promise<MarketReadModel[]> {
   const deployment = requireDeployment(maybeDeployment);
-  const { publicClient } = clients(deployment, "deployer");
-  const decimals = deployment.contracts.mockUSDC.decimals;
+  const publicClient = publicClientFor(deployment);
+  const decimals = deployment.contracts.usdc.decimals;
 
   return Promise.all(
     deployment.markets.map(async (market) => {
@@ -504,6 +795,8 @@ async function readMarkets(maybeDeployment: LocalDeployment | null): Promise<Mar
         invalidConditions: market.invalidConditions ?? ["Local demo market metadata is unavailable."],
         metadataURI: market.metadataURI,
         specHash: market.specHash as `0x${string}`,
+        imageUrl: market.imageUrl,
+        sourceIdea: market.sourceIdea,
         creator: "Creator",
         yesPrice,
         noPrice,
@@ -517,14 +810,14 @@ async function readMarkets(maybeDeployment: LocalDeployment | null): Promise<Mar
 }
 
 async function quoteTrade(
-  deployment: LocalDeployment,
+  deployment: AppDeployment,
   marketId: string,
   action: TradeAction,
   amount: bigint,
   slippageBps = 100,
 ) {
   const market = findMarket(deployment, marketId);
-  const { publicClient } = clients(deployment, "deployer");
+  const publicClient = publicClientFor(deployment);
   const marketAddress = market.address as Address;
   const [amountOut, fee] =
     action === "BUY_YES"
@@ -564,7 +857,7 @@ async function quoteTrade(
 }
 
 async function buildTradeQuote(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   marketId: string,
   action: TradeAction,
   rawAmount: string,
@@ -606,7 +899,7 @@ function displayUnits(value: bigint, decimals: number) {
   return trimmedFraction ? `${localizedWhole}.${trimmedFraction}` : localizedWhole;
 }
 
-function findMarket(deployment: LocalDeployment, marketId: string) {
+function findMarket(deployment: AppDeployment, marketId: string) {
   const market = deployment.markets.find((candidate) => candidate.id === marketId);
   if (!market) {
     throw new Error(`Unknown market: ${marketId}`);
@@ -650,7 +943,7 @@ function redeemableForOutcome(finalOutcome: number, yesBalance: bigint, noBalanc
 }
 
 async function readLpPosition(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actors: DevActor[],
   markets: MarketReadModel[],
   actorId: string,
@@ -659,11 +952,10 @@ async function readLpPosition(
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const readModel = markets.find((candidate) => candidate.id === marketId);
-  const actor = actors.find((candidate) => candidate.id === actorId);
-  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const actorAddress = actorReadAddress(deployment, actors, actorId);
   const marketAddress = market.address as Address;
-  const decimals = deployment.contracts.mockUSDC.decimals;
-  const { publicClient } = clients(deployment, actorId);
+  const decimals = deployment.contracts.usdc.decimals;
+  const publicClient = publicClientFor(deployment);
 
   const [shares, pending, totalShares, accLpFeePerShare, lpFeeDebt, lpFeePrecision] = await Promise.all([
     publicClient.readContract({
@@ -716,7 +1008,7 @@ async function readLpPosition(
 }
 
 async function readMarketLifecycle(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actors: DevActor[],
   actorId: string,
   marketId: string,
@@ -724,10 +1016,10 @@ async function readMarketLifecycle(
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const actor = actors.find((candidate) => candidate.id === actorId);
-  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const actorAddressValue = actorReadAddress(deployment, actors, actorId);
   const marketAddress = market.address as Address;
-  const decimals = deployment.contracts.mockUSDC.decimals;
-  const { publicClient } = clients(deployment, actorId);
+  const decimals = deployment.contracts.usdc.decimals;
+  const publicClient = publicClientFor(deployment);
 
   const [
     state,
@@ -760,13 +1052,13 @@ async function readMarketLifecycle(
       address: deployment.contracts.outcomeToken.address as Address,
       abi: outcomeTokenAbi,
       functionName: "balanceOf",
-      args: [actorAddress, BigInt(market.yesTokenId)],
+      args: [actorAddressValue, BigInt(market.yesTokenId)],
     }),
     publicClient.readContract({
       address: deployment.contracts.outcomeToken.address as Address,
       abi: outcomeTokenAbi,
       functionName: "balanceOf",
-      args: [actorAddress, BigInt(market.noTokenId)],
+      args: [actorAddressValue, BigInt(market.noTokenId)],
     }),
     publicClient.getBlock(),
   ]);
@@ -775,9 +1067,9 @@ async function readMarketLifecycle(
   const proposedOutcomeNumber = Number(proposedOutcome);
   const now = latestBlock.timestamp;
   const redeemable = stateNumber === 3 ? redeemableForOutcome(finalOutcomeNumber, yesBalance, noBalance) : 0n;
-  const isCreator = actorAddress.toLowerCase() === creator.toLowerCase();
-  const isProtocolRecipient = actorAddress.toLowerCase() === protocolFeeRecipient.toLowerCase();
-  const isResolver = actor?.role === "Resolver";
+  const isCreator = actorAddressValue.toLowerCase() === creator.toLowerCase();
+  const isProtocolRecipient = actorAddressValue.toLowerCase() === protocolFeeRecipient.toLowerCase();
+  const isResolver = actorIsResolver(deployment, actor, actorAddressValue);
   const resolvedNonInvalid = stateNumber === 3 && finalOutcomeNumber !== 3;
 
   return {
@@ -806,7 +1098,7 @@ async function readMarketLifecycle(
 }
 
 async function readMarketUserState(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actors: DevActor[],
   markets: MarketReadModel[],
   actorId: string,
@@ -814,11 +1106,10 @@ async function readMarketUserState(
 ): Promise<MarketUserState> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const actor = actors.find((candidate) => candidate.id === actorId);
-  const actorAddress = actor?.address ?? actorAccount(deployment, actorId).address;
+  const actorAddressValue = actorReadAddress(deployment, actors, actorId);
   const marketAddress = market.address as Address;
-  const decimals = deployment.contracts.mockUSDC.decimals;
-  const { publicClient } = clients(deployment, actorId);
+  const decimals = deployment.contracts.usdc.decimals;
+  const publicClient = publicClientFor(deployment);
 
   const [reserves, yesBalance, noBalance, lpPosition] = await Promise.all([
     publicClient.readContract({
@@ -827,16 +1118,16 @@ async function readMarketUserState(
       functionName: "reserves",
     }),
     publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address as Address,
+      address: deployment.contracts.outcomeToken.address,
       abi: outcomeTokenAbi,
       functionName: "balanceOf",
-      args: [actorAddress, BigInt(market.yesTokenId)],
+      args: [actorAddressValue, BigInt(market.yesTokenId)],
     }),
     publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address as Address,
+      address: deployment.contracts.outcomeToken.address,
       abi: outcomeTokenAbi,
       functionName: "balanceOf",
-      args: [actorAddress, BigInt(market.noTokenId)],
+      args: [actorAddressValue, BigInt(market.noTokenId)],
     }),
     readLpPosition(maybeDeployment, actors, markets, actorId, marketId),
   ]);
@@ -858,7 +1149,7 @@ async function readMarketUserState(
 }
 
 async function readLpPortfolio(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actors: DevActor[],
   markets: MarketReadModel[],
   actorId: string,
@@ -902,7 +1193,7 @@ async function readLpPortfolio(
     noShares: userState.noBalance,
     lpShares: userState.lpShares,
     redeemable: lifecycle.redeemable,
-    claimable: `${displayUnits(claimableRaw, deployment.contracts.mockUSDC.decimals)} USDC`,
+    claimable: `${displayUnits(claimableRaw, deployment.contracts.usdc.decimals)} USDC`,
   }));
   const claimable = activeReadbacks.reduce((total, position) => total + position.claimableRaw, 0n);
 
@@ -913,24 +1204,27 @@ async function readLpPortfolio(
       yesMarkets: positions.filter((position) => position.yesShares !== "0").length,
       noMarkets: positions.filter((position) => position.noShares !== "0").length,
       lpMarkets: positions.filter((position) => position.lpShares !== "0 LP").length,
-      claimable: `${displayUnits(claimable, deployment.contracts.mockUSDC.decimals)} USDC`,
+      claimable: `${displayUnits(claimable, deployment.contracts.usdc.decimals)} USDC`,
     },
   };
 }
 
 async function executeCreateMarket(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   draft: MarketDraftResponse,
+  sourceMetadata: CreateMarketSourceMetadata = {},
+  wallet?: ConnectedWalletRuntime,
 ): Promise<MarketCreationResult> {
   const deployment = requireDeployment(maybeDeployment);
-  const factory = deployment.contracts.iknowMarketFactory.address as Address;
-  const { walletClient } = clients(deployment, actorId);
+  const factory = deployment.contracts.iknowMarketFactory.address;
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
   const totalUsdc = BigInt(draft.factoryArgs.creationBond) + BigInt(draft.factoryArgs.initialLiquidity);
 
-  await approveUsdc(deployment, actorId, factory, totalUsdc);
+  await approveUsdc(deployment, actorId, factory, totalUsdc, wallet);
 
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: factory,
     abi: iknowMarketFactoryAbi,
     functionName: "createMarket",
@@ -953,44 +1247,64 @@ async function executeCreateMarket(
     throw new Error("MarketCreated event missing from createMarket receipt");
   }
   const id = `${shortId(draft.draft.question)}-${hash.slice(2, 8)}`;
+  const market: DeployedMarket = {
+    id,
+    address: marketAddress,
+    specHash: draft.factoryArgs.specHash,
+    metadataURI: draft.factoryArgs.metadataURI,
+    question: draft.draft.question,
+    closeTime: draft.factoryArgs.closeTime,
+    resolutionSource: draft.draft.resolutionSource,
+    invalidConditions: draft.draft.invalidConditions,
+    imageUrl: sourceMetadata.imageUrl,
+    sourceIdea: sourceMetadata.sourceIdea,
+    creationBond: draft.factoryArgs.creationBond,
+    initialLiquidity: draft.factoryArgs.initialLiquidity,
+    yesTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 0]))).toString(),
+    noTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 1]))).toString(),
+  };
+
+  await persistCreatedMarket(deployment, market);
 
   return {
     hash,
-    market: {
-      id,
-      address: marketAddress,
-      specHash: draft.factoryArgs.specHash,
-      metadataURI: draft.factoryArgs.metadataURI,
-      question: draft.draft.question,
-      closeTime: draft.factoryArgs.closeTime,
-      resolutionSource: draft.draft.resolutionSource,
-      invalidConditions: draft.draft.invalidConditions,
-      creationBond: draft.factoryArgs.creationBond,
-      initialLiquidity: draft.factoryArgs.initialLiquidity,
-      yesTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 0]))).toString(),
-      noTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 1]))).toString(),
-    },
+    market,
   };
 }
 
+async function persistCreatedMarket(deployment: AppDeployment, market: DeployedMarket) {
+  try {
+    const scope = deployment.mode === "arc-testnet" ? "testnet" : "local";
+    await fetch(`${apiBaseUrl}/${scope}/deployment/markets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ market }),
+    });
+  } catch {
+    // Transaction success is the source of truth; local artifact persistence is a convenience for dev readback.
+  }
+}
+
 async function executeBuy(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
   side: "YES" | "NO",
   usdcAmount: string,
   slippageBps = 100,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const amount = parseTradeAmount(deployment, usdcAmount);
   const quote = await quoteTrade(deployment, marketId, side === "YES" ? "BUY_YES" : "BUY_NO", amount, slippageBps);
   const marketAddress = market.address as Address;
-  const { walletClient } = clients(deployment, actorId);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
 
-  await approveUsdc(deployment, actorId, marketAddress, amount);
+  await approveUsdc(deployment, actorId, marketAddress, amount, wallet);
 
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: side === "YES" ? "buyYes" : "buyNo",
@@ -1002,23 +1316,25 @@ async function executeBuy(
 }
 
 async function executeSell(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
   side: "YES" | "NO",
   outcomeAmount: string,
   slippageBps = 100,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const amount = parseTradeAmount(deployment, outcomeAmount);
   const quote = await quoteTrade(deployment, marketId, side === "YES" ? "SELL_YES" : "SELL_NO", amount, slippageBps);
   const marketAddress = market.address as Address;
-  const { walletClient } = clients(deployment, actorId);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
 
-  await approveOutcomeSpender(deployment, actorId, marketAddress);
+  await approveOutcomeSpender(deployment, actorId, marketAddress, wallet);
 
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: side === "YES" ? "sellYes" : "sellNo",
@@ -1030,20 +1346,22 @@ async function executeSell(
 }
 
 async function executeAddLiquidity(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
   usdcAmount: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const amount = parseTradeAmount(deployment, usdcAmount);
   const marketAddress = market.address as Address;
-  const { walletClient } = clients(deployment, actorId);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
 
-  await approveUsdc(deployment, actorId, marketAddress, maxUint256);
+  await approveUsdc(deployment, actorId, marketAddress, maxUint256, wallet);
 
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "addLiquidity",
@@ -1055,21 +1373,23 @@ async function executeAddLiquidity(
 }
 
 async function executeRemoveLiquidity(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
   lpShares: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const shares = parseUnits(lpShares || "0", deployment.contracts.mockUSDC.decimals);
+  const shares = parseUnits(lpShares || "0", deployment.contracts.usdc.decimals);
   if (shares <= 0n) {
     throw new Error("LP shares must be greater than zero");
   }
   const marketAddress = market.address as Address;
-  const { walletClient } = clients(deployment, actorId);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
 
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "removeLiquidity",
@@ -1081,14 +1401,16 @@ async function executeRemoveLiquidity(
 }
 
 async function executeCloseMarket(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const { walletClient } = clients(deployment, actorId);
-  const hash = await walletClient.writeContract({
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "close",
@@ -1099,16 +1421,18 @@ async function executeCloseMarket(
 }
 
 async function executeProposeResolution(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
   outcome: ResolutionOutcomeInput,
   evidenceURI: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const { walletClient } = clients(deployment, actorId);
-  const hash = await walletClient.writeContract({
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "proposeResolution",
@@ -1120,14 +1444,16 @@ async function executeProposeResolution(
 }
 
 async function executeFinalizeResolution(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const { walletClient } = clients(deployment, actorId);
-  const hash = await walletClient.writeContract({
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "finalizeResolution",
@@ -1138,14 +1464,16 @@ async function executeFinalizeResolution(
 }
 
 async function executeRedeem(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const { walletClient } = clients(deployment, actorId);
-  const hash = await walletClient.writeContract({
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "redeem",
@@ -1156,21 +1484,24 @@ async function executeRedeem(
 }
 
 async function executeClaimCreatorFees(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const marketAddress = market.address as Address;
-  const { publicClient, walletClient } = clients(deployment, actorId);
-  const recipient = actorAccount(deployment, actorId).address;
+  const publicClient = publicClientFor(deployment);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const recipient = recipientFor(deployment, actorId, wallet);
   const amount = await publicClient.readContract({
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "creatorFeePool",
   });
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "claimCreatorFees",
@@ -1182,21 +1513,24 @@ async function executeClaimCreatorFees(
 }
 
 async function executeClaimProtocolFees(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
   const marketAddress = market.address as Address;
-  const { publicClient, walletClient } = clients(deployment, actorId);
-  const recipient = actorAccount(deployment, actorId).address;
+  const publicClient = publicClientFor(deployment);
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const recipient = recipientFor(deployment, actorId, wallet);
   const amount = await publicClient.readContract({
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "protocolFeePool",
   });
-  const hash = await walletClient.writeContract({
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: marketAddress,
     abi: iknowMarketAbi,
     functionName: "claimProtocolFees",
@@ -1208,15 +1542,17 @@ async function executeClaimProtocolFees(
 }
 
 async function executeClaimCreationBond(
-  maybeDeployment: LocalDeployment | null,
+  maybeDeployment: AppDeployment | null,
   actorId: string,
   marketId: string,
+  wallet?: ConnectedWalletRuntime,
 ): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
   const market = findMarket(deployment, marketId);
-  const { walletClient } = clients(deployment, actorId);
-  const recipient = actorAccount(deployment, actorId).address;
-  const hash = await walletClient.writeContract({
+  const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
+  const recipient = recipientFor(deployment, actorId, wallet);
+  const hash = await writeContractUnchecked(walletClient, {
+    account,
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "claimCreationBond",
@@ -1227,7 +1563,11 @@ async function executeClaimCreationBond(
   return hash;
 }
 
-async function rpcRequest(deployment: LocalDeployment, method: string, params: unknown[] = []) {
+async function rpcRequest(deployment: AppDeployment, method: string, params: unknown[] = []) {
+  if (deployment.mode !== "local") {
+    throw new Error("Time warp is only available on local Anvil.");
+  }
+
   const response = await fetch(deployment.chain.rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -1241,20 +1581,21 @@ async function rpcRequest(deployment: LocalDeployment, method: string, params: u
   return result.result;
 }
 
-async function mineAtOrAfter(deployment: LocalDeployment, timestamp: bigint) {
-  const { publicClient } = clients(deployment, "deployer");
-  const block = await publicClient.getBlock();
+async function mineAtOrAfter(deployment: AppDeployment, timestamp: bigint) {
+  const block = await publicClientFor(deployment).getBlock();
   if (block.timestamp < timestamp) {
     await rpcRequest(deployment, "evm_setNextBlockTimestamp", [Number(timestamp)]);
   }
   await rpcRequest(deployment, "evm_mine");
 }
 
-async function executeWarpToClose(maybeDeployment: LocalDeployment | null, marketId: string): Promise<Hex> {
+async function executeWarpToClose(maybeDeployment: AppDeployment | null, marketId: string): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
+  if (deployment.mode !== "local") {
+    throw new Error("Time warp is only available on local Anvil.");
+  }
   const market = findMarket(deployment, marketId);
-  const { publicClient } = clients(deployment, "deployer");
-  const closeTime = await publicClient.readContract({
+  const closeTime = await publicClientFor(deployment).readContract({
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "closeTime",
@@ -1264,11 +1605,13 @@ async function executeWarpToClose(maybeDeployment: LocalDeployment | null, marke
   return "0x0000000000000000000000000000000000000000000000000000000000000000";
 }
 
-async function executeWarpChallengeWindow(maybeDeployment: LocalDeployment | null, marketId: string): Promise<Hex> {
+async function executeWarpChallengeWindow(maybeDeployment: AppDeployment | null, marketId: string): Promise<Hex> {
   const deployment = requireDeployment(maybeDeployment);
+  if (deployment.mode !== "local") {
+    throw new Error("Time warp is only available on local Anvil.");
+  }
   const market = findMarket(deployment, marketId);
-  const { publicClient } = clients(deployment, "deployer");
-  const finalizeAfter = await publicClient.readContract({
+  const finalizeAfter = await publicClientFor(deployment).readContract({
     address: market.address as Address,
     abi: iknowMarketAbi,
     functionName: "finalizeAfter",
@@ -1621,8 +1964,32 @@ async function buildDraftPreview(input: CreateDraftInput): Promise<MarketDraftRe
       specHash,
       metadataURI: `local://drafts/${specHash.slice(2, 12)}`,
       closeTime: closeTimeSeconds,
-      creationBond: parseUnits(input.creationBond || "0", 6).toString(),
-      initialLiquidity: parseUnits(input.initialLiquidity || "0", 6).toString(),
+      creationBond: parseCreateUsdcUnits(
+        input.creationBond,
+        CREATE_MIN_CREATION_BOND_USDC,
+        CREATE_MIN_CREATION_BOND_UNITS,
+        "Safety deposit",
+      ).toString(),
+      initialLiquidity: parseCreateUsdcUnits(
+        input.initialLiquidity,
+        CREATE_MIN_INITIAL_LIQUIDITY_USDC,
+        CREATE_MIN_INITIAL_LIQUIDITY_UNITS,
+        "Money to start the market",
+      ).toString(),
     },
   });
+}
+
+function parseCreateUsdcUnits(value: string, fallback: string, minimum: bigint, label: string) {
+  const text = (value || fallback).trim();
+  if (!/^\d+(\.\d{1,6})?$/.test(text)) {
+    throw new Error("USDC amounts must be positive numbers with at most 6 decimal places");
+  }
+
+  const parsed = parseUnits(text, 6);
+  if (parsed < minimum) {
+    throw new Error(`${label} must be at least ${formatUnits(minimum, 6)} USDC`);
+  }
+
+  return parsed;
 }

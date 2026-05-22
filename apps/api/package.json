@@ -11,9 +11,10 @@
     "lint": "echo \"lint not configured\""
   },
   "dependencies": {
-    "@iknow/shared": "workspace:*",
     "@hono/node-server": "^1.19.6",
+    "@iknow/shared": "workspace:*",
     "hono": "^4.11.2",
+    "viem": "^2.49.2",
     "zod": "^4.2.0"
   },
   "devDependencies": {

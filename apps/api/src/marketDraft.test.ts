@@ -19,10 +19,38 @@ test("creates contract-ready market draft response", () => {
   assert.equal(response.factoryArgs.closeTime, Math.floor(Date.parse(closeTime) / 1000));
   assert.match(response.factoryArgs.specHash, /^0x[a-f0-9]{64}$/);
   assert.equal(response.factoryArgs.metadataURI, `urn:iknow:market:${response.factoryArgs.specHash}`);
-  assert.equal(response.factoryArgs.creationBond, "100000000");
-  assert.equal(response.factoryArgs.initialLiquidity, "1000000000");
+  assert.equal(response.factoryArgs.creationBond, "5000000");
+  assert.equal(response.factoryArgs.initialLiquidity, "10000000");
   assert.equal(response.specHashInput.closeTime, response.draft.closeTime);
   assert.equal(response.specHashInput.resolutionSource, response.draft.resolutionSource);
+});
+
+test("rejects creator capital below product minimums", () => {
+  const closeTime = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  assert.throws(
+    () =>
+      createMarketDraftResponse({
+        question: "Will this tiny liquidity market be rejected?",
+        closeTime,
+        resolutionSource: "Official source.",
+        creationBond: "5",
+        initialLiquidity: "9.999999",
+      }),
+    /Money to start the market must be at least 10 USDC/,
+  );
+
+  assert.throws(
+    () =>
+      createMarketDraftResponse({
+        question: "Will this tiny bond market be rejected?",
+        closeTime,
+        resolutionSource: "Official source.",
+        creationBond: "4.999999",
+        initialLiquidity: "10",
+      }),
+    /Safety deposit must be at least 5 USDC/,
+  );
 });
 
 test("rejects closeTime values the factory would reject", () => {

@@ -24,13 +24,12 @@ contract IknowMarketInvariantTest is IknowTestBase {
         super.setUp();
 
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury, 1 hours);
         outcomeToken.transferOwnership(address(factory));
         require(
             DEFAULT_LP_FEE_BPS + DEFAULT_CREATOR_FEE_BPS + DEFAULT_PROTOCOL_FEE_BPS == DEFAULT_TOTAL_FEE_BPS,
             "fee split mismatch"
         );
-        require(factory.defaultFeeBps() == DEFAULT_TOTAL_FEE_BPS, "factory total fee mismatch");
 
         closeTime = block.timestamp + 30 days;
         _approveUSDC(creator, address(factory), DEFAULT_CREATION_BOND + DEFAULT_INITIAL_LIQUIDITY);

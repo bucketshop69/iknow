@@ -88,7 +88,8 @@ contract DeployLocal {
             IERC20(address(deployment.usdc)),
             deployment.outcomeToken,
             deployment.actors.resolver,
-            deployment.actors.protocol
+            deployment.actors.protocol,
+            1 hours
         );
         deployment.outcomeToken.transferOwnership(address(deployment.factory));
         _fundActors(deployment);

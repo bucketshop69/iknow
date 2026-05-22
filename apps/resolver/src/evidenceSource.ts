@@ -22,6 +22,11 @@ const localMarketFixtures: Record<string, { outcome: SuggestedOutcome; confidenc
     confidence: 0.9,
     fact: "Local deployment, API, web, and contract scripts exist for the MVP workflow.",
   },
+  "arc-smoke-test": {
+    outcome: "YES",
+    confidence: 0.99,
+    fact: "The Arc testnet smoke market was intentionally created to exercise the YES resolution path.",
+  },
 };
 
 const eplResults = [
@@ -79,11 +84,11 @@ function resolveFromMockSources(
       status: "resolved",
       outcome: localFixture.outcome,
       confidence: localFixture.confidence,
-      evidenceLinks: [{ title: "local MVP evidence", url: "local://iknow/evidence/ship-mvp", accessedAt: observedAt }],
+      evidenceLinks: [{ title: "local fixture evidence", url: `local://iknow/evidence/${market.id}`, accessedAt: observedAt }],
       extractedFacts: [
         {
           claim: localFixture.fact,
-          sourceUrl: "local://iknow/evidence/ship-mvp",
+          sourceUrl: `local://iknow/evidence/${market.id}`,
           observedAt,
           supportsOutcome: localFixture.outcome,
         },
@@ -140,17 +145,29 @@ function invalidChecksFor(market: DeployedMarket): EvidencePacket["invalidChecks
 
   return conditions.map((condition) => ({
     condition,
-    status: isLocalMockEplCondition(condition) ? ("PASSED" as const) : ("UNKNOWN" as const),
-    explanation: isLocalMockEplCondition(condition)
-      ? "The deterministic local EPL source has a final Arsenal 2-1 Chelsea result for the named teams."
+    status: isLocalMockCondition(condition) ? ("PASSED" as const) : ("UNKNOWN" as const),
+    explanation: isLocalMockCondition(condition)
+      ? "The deterministic local source did not find this invalid condition triggered."
       : "The deterministic local mock source cannot verify this invalid condition yet.",
-    evidenceUrls: isLocalMockEplCondition(condition) ? ["local://epl/results/arsenal-vs-chelsea"] : [],
+    evidenceUrls: isLocalMockEplCondition(condition)
+      ? ["local://epl/results/arsenal-vs-chelsea"]
+      : isLocalSmokeCondition(condition)
+        ? ["local://iknow/evidence/arc-smoke-test"]
+        : [],
   }));
+}
+
+function isLocalMockCondition(condition: string) {
+  return isLocalMockEplCondition(condition) || isLocalSmokeCondition(condition);
 }
 
 function isLocalMockEplCondition(condition: string) {
   const normalized = condition.toLowerCase();
   return normalized.includes("local mock epl") || normalized.includes("arsenal") || normalized.includes("chelsea");
+}
+
+function isLocalSmokeCondition(condition: string) {
+  return condition.toLowerCase().includes("malformed metadata");
 }
 
 function resolveEplMarket(

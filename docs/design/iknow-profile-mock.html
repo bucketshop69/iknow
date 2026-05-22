@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iknow profile mock</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --ink: #1d1b18;
+        --muted: #776f65;
+        --line: #ddd3c3;
+        --card: #fffdf8;
+        --card-2: #f9f4eb;
+        --nav-bg: rgba(255, 253, 248, 0.62);
+        --nav-active-text: #fffdf8;
+        --primary: #d8b85a;
+        --primary-ink: #211b09;
+        --yes: #6d9f63;
+        --yes-bg: #edf6e8;
+        --yes-line: #d3e7c9;
+        --no: #d9766d;
+        --no-bg: #fbebe9;
+        --no-line: #f0d1ce;
+        --receipt: #8f7d66;
+        --receipt-bg: #f1eadf;
+        --mascot-bg: #fff8e9;
+        --mascot-shadow: #d7c8ad;
+        --input-bg: #fffaf1;
+        --import-text: #fffdf8;
+        --import-muted: #d8cdbb;
+        --shadow: 0 18px 45px rgba(69, 54, 35, 0.12);
+        --text-shadow: 0 1px 0 rgba(255, 253, 248, 0.72), 0 8px 18px rgba(69, 54, 35, 0.08);
+      }
+
+      [data-theme="dark"] {
+        --bg: #1b1916;
+        --ink: #f4f1ea;
+        --muted: #b3aa9d;
+        --line: #403a33;
+        --card: #26231f;
+        --card-2: #302b25;
+        --nav-bg: rgba(38, 35, 31, 0.72);
+        --nav-active-text: #1d1b18;
+        --primary: #d9bd72;
+        --primary-ink: #211b09;
+        --yes: #b7c89c;
+        --yes-bg: #2c3226;
+        --yes-line: #444d3d;
+        --no: #d79a93;
+        --no-bg: #332725;
+        --no-line: #4f3834;
+        --receipt: #d1c3ad;
+        --receipt-bg: #342f28;
+        --mascot-bg: #efe3c9;
+        --mascot-shadow: #675b49;
+        --input-bg: #1f1c18;
+        --import-text: #1d1b18;
+        --import-muted: #5d513c;
+        --shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+        --text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), 0 10px 22px rgba(0, 0, 0, 0.24);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button {
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .topbar,
+      .main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      .topbar {
+        padding-top: 20px;
+        padding-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand,
+      .actions,
+      .profile-name,
+      .call-top,
+      .activity-item {
+        display: flex;
+        align-items: center;
+      }
+
+      .brand {
+        gap: 10px;
+      }
+
+      .mascot,
+      .avatar {
+        border-radius: 14px 14px 18px 18px;
+        background: var(--mascot-bg);
+        border: 2px solid var(--ink);
+        position: relative;
+        box-shadow: 5px 5px 0 var(--mascot-shadow);
+        flex: 0 0 auto;
+      }
+
+      .mascot {
+        width: 42px;
+        height: 42px;
+      }
+
+      .avatar {
+        width: 76px;
+        height: 76px;
+        border-radius: 22px 22px 28px 28px;
+        box-shadow: 7px 7px 0 var(--mascot-shadow);
+      }
+
+      .mascot::before,
+      .mascot::after,
+      .avatar::before,
+      .avatar::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        background: var(--ink);
+      }
+
+      .mascot::before,
+      .mascot::after {
+        top: 15px;
+        width: 5px;
+        height: 5px;
+      }
+
+      .avatar::before,
+      .avatar::after {
+        top: 29px;
+        width: 7px;
+        height: 7px;
+      }
+
+      .mascot::before {
+        left: 12px;
+      }
+
+      .mascot::after {
+        right: 12px;
+      }
+
+      .avatar::before {
+        left: 23px;
+      }
+
+      .avatar::after {
+        right: 23px;
+      }
+
+      .handle {
+        position: absolute;
+        right: -12px;
+        top: 13px;
+        width: 14px;
+        height: 16px;
+        border: 2px solid var(--ink);
+        border-left: 0;
+        border-radius: 0 10px 10px 0;
+      }
+
+      .avatar .handle {
+        right: -18px;
+        top: 26px;
+        width: 20px;
+        height: 24px;
+        border-radius: 0 14px 14px 0;
+      }
+
+      .smirk {
+        position: absolute;
+        left: 13px;
+        bottom: 11px;
+        width: 17px;
+        height: 7px;
+        border-bottom: 2px solid var(--ink);
+        border-radius: 0 0 20px 20px;
+        transform: rotate(-5deg);
+      }
+
+      .avatar .smirk {
+        left: 25px;
+        bottom: 21px;
+        width: 27px;
+        height: 10px;
+      }
+
+      .brand-copy {
+        display: grid;
+        line-height: 1.1;
+      }
+
+      .brand-copy strong {
+        font-size: 20px;
+      }
+
+      .brand-copy span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nav {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        background: var(--nav-bg);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+      }
+
+      .nav button,
+      .theme-toggle,
+      .wallet {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        border-radius: 999px;
+        min-height: 36px;
+        padding: 0 14px;
+        font-weight: 800;
+      }
+
+      .nav button.active {
+        background: var(--ink);
+        color: var(--nav-active-text);
+      }
+
+      .theme-toggle,
+      .wallet {
+        border: 1px solid var(--line);
+        background: var(--card);
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+      }
+
+      .actions {
+        gap: 8px;
+      }
+
+      .main {
+        padding-top: 22px;
+        padding-bottom: 56px;
+      }
+
+      .profile-hero {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        box-shadow: var(--shadow);
+        padding: 26px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 22px;
+      }
+
+      .profile-name {
+        gap: 20px;
+        align-items: center;
+      }
+
+      .kicker {
+        margin: 0 0 8px;
+        color: var(--receipt);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-shadow: var(--text-shadow);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(34px, 5.6vw, 58px);
+        line-height: 0.96;
+      }
+
+      .profile-name p,
+      .section-head span,
+      .call-card p,
+      .created-card p,
+      .activity-item span {
+        color: var(--muted);
+      }
+
+      .profile-name p {
+        margin: 10px 0 0;
+        font-size: 16px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        min-width: 350px;
+      }
+
+      .stat {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px;
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+        margin-bottom: 6px;
+      }
+
+      .stat strong {
+        font-size: 26px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .section,
+      .claim-card,
+      .activity {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+      }
+
+      .section {
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .call-list,
+      .created-list,
+      .activity-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .call-card,
+      .created-card {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .call-top {
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .call-card h3,
+      .created-card h3 {
+        margin: 0;
+        font-size: 19px;
+        line-height: 1.25;
+      }
+
+      .call-card p,
+      .created-card p {
+        margin: 7px 0 0;
+        line-height: 1.45;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .pill.yes {
+        background: var(--yes-bg);
+        border-color: var(--yes-line);
+        color: var(--yes);
+      }
+
+      .pill.no {
+        background: var(--no-bg);
+        border-color: var(--no-line);
+        color: var(--no);
+      }
+
+      .call-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .primary,
+      .secondary {
+        min-height: 44px;
+        border-radius: 16px;
+        padding: 0 16px;
+        font-weight: 900;
+      }
+
+      .primary {
+        border: 0;
+        background: var(--primary);
+        color: var(--primary-ink);
+      }
+
+      .secondary {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+      }
+
+      .claim-card {
+        background: var(--ink);
+        color: var(--import-text);
+        padding: 22px;
+        margin-bottom: 18px;
+      }
+
+      .claim-card span {
+        color: var(--import-muted);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .claim-card h2 {
+        margin: 8px 0 8px;
+        font-size: 34px;
+        line-height: 1;
+      }
+
+      .claim-card p {
+        margin: 0 0 18px;
+        color: var(--import-muted);
+        line-height: 1.45;
+      }
+
+      .created-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .mini-stat {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 12px;
+      }
+
+      .mini-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 4px;
+      }
+
+      .mini-stat strong {
+        font-size: 18px;
+      }
+
+      .activity {
+        padding: 20px;
+      }
+
+      .activity h2 {
+        margin: 0 0 14px;
+        font-size: 24px;
+      }
+
+      .activity-item {
+        gap: 12px;
+        align-items: start;
+      }
+
+      .activity-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 99px;
+        background: var(--primary);
+        margin-top: 4px;
+        flex: 0 0 auto;
+      }
+
+      .activity-item strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      @media (max-width: 920px) {
+        .topbar,
+        .profile-hero {
+          flex-wrap: wrap;
+        }
+
+        .profile-hero,
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .stats {
+          min-width: 0;
+        }
+
+        .nav {
+          order: 3;
+          width: 100%;
+          overflow-x: auto;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .topbar,
+        .main {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .actions,
+        .call-top,
+        .profile-name {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .profile-name {
+          display: grid;
+        }
+
+        .stats,
+        .created-meta {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mascot" aria-hidden="true">
+            <span class="handle"></span>
+            <span class="smirk"></span>
+          </div>
+          <div class="brand-copy">
+            <strong>iknow</strong>
+            <span>calls with receipts</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="Main navigation">
+          <button>Home</button>
+          <button>Create</button>
+          <button class="active">Profile</button>
+        </nav>
+        <div class="actions">
+          <button class="theme-toggle" type="button" aria-label="Toggle color mode">Dark mode</button>
+          <div class="wallet">Arc Testnet</div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="profile-hero">
+          <div class="profile-name">
+            <div class="avatar" aria-hidden="true">
+              <span class="handle"></span>
+              <span class="smirk"></span>
+            </div>
+            <div>
+              <p class="kicker">Your iknow</p>
+              <h1>Amrita knows.</h1>
+              <p>0xc9BE...51CF · making calls on Arc Testnet</p>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat">
+              <span>Markets joined</span>
+              <strong>8</strong>
+            </div>
+            <div class="stat">
+              <span>Markets created</span>
+              <strong>3</strong>
+            </div>
+            <div class="stat">
+              <span>Ready to claim</span>
+              <strong>2</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="layout">
+          <div>
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h2>Your calls</h2>
+                  <span>Everything you picked, waiting or won.</span>
+                </div>
+              </div>
+              <div class="call-list">
+                <article class="call-card">
+                  <div class="call-top">
+                    <div>
+                      <h3>Will CSK beat SRH in their next IPL match?</h3>
+                      <p>You picked Yes · 100 USDC</p>
+                    </div>
+                    <span class="pill yes">Ready to claim</span>
+                  </div>
+                  <div class="call-actions">
+                    <button class="primary">Claim 156.42 USDC</button>
+                    <button class="secondary">View receipts</button>
+                  </div>
+                </article>
+
+                <article class="call-card">
+                  <div class="call-top">
+                    <div>
+                      <h3>Will BTC close above $110k on Friday?</h3>
+                      <p>You picked No · 50 USDC</p>
+                    </div>
+                    <span class="pill">Live</span>
+                  </div>
+                  <div class="call-actions">
+                    <button class="secondary">View market</button>
+                  </div>
+                </article>
+
+                <article class="call-card">
+                  <div class="call-top">
+                    <div>
+                      <h3>Will the Arc smoke market resolve YES?</h3>
+                      <p>You picked Yes · receipts posted</p>
+                    </div>
+                    <span class="pill yes">Claimed</span>
+                  </div>
+                  <div class="call-actions">
+                    <button class="secondary">View receipts</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h2>Markets you created</h2>
+                  <span>Calls you started for other people to join.</span>
+                </div>
+              </div>
+              <div class="created-list">
+                <article class="created-card">
+                  <div>
+                    <h3>Will Arsenal beat Chelsea in their next league match?</h3>
+                    <p>Agents are checking the details when this ends.</p>
+                  </div>
+                  <div class="created-meta">
+                    <div class="mini-stat">
+                      <span>People joined</span>
+                      <strong>42</strong>
+                    </div>
+                    <div class="mini-stat">
+                      <span>You earned</span>
+                      <strong>18.40 USDC</strong>
+                    </div>
+                  </div>
+                  <button class="secondary">View market</button>
+                </article>
+              </div>
+            </section>
+          </div>
+
+          <aside>
+            <section class="claim-card">
+              <span>You called it.</span>
+              <h2>156.42 USDC</h2>
+              <p>CSK beat SRH. Receipts are posted and your winnings are ready.</p>
+              <button class="primary">Claim now</button>
+            </section>
+
+            <section class="activity">
+              <h2>Activity</h2>
+              <div class="activity-list">
+                <div class="activity-item">
+                  <span class="activity-dot"></span>
+                  <div>
+                    <strong>You joined Yes on CSK vs SRH</strong>
+                    <span>Today</span>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-dot"></span>
+                  <div>
+                    <strong>Receipts posted</strong>
+                    <span>CSK vs SRH</span>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-dot"></span>
+                  <div>
+                    <strong>You claimed 0.190361 USDC</strong>
+                    <span>Arc smoke market</span>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-dot"></span>
+                  <div>
+                    <strong>You created a market</strong>
+                    <span>Arsenal vs Chelsea</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+    <script>
+      const root = document.documentElement;
+      const toggle = document.querySelector(".theme-toggle");
+      const savedTheme = localStorage.getItem("iknow-theme");
+
+      function applyTheme(theme) {
+        root.dataset.theme = theme;
+        toggle.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+        localStorage.setItem("iknow-theme", theme);
+      }
+
+      applyTheme(savedTheme || "light");
+      toggle.addEventListener("click", () => {
+        applyTheme(root.dataset.theme === "dark" ? "light" : "dark");
+      });
+    </script>
+  </body>
+</html>
