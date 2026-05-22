@@ -51,6 +51,8 @@ import type {
 
 const CREATE_MIN_CREATION_BOND_UNITS = parseUnits(CREATE_MIN_CREATION_BOND_USDC, 6);
 const CREATE_MIN_INITIAL_LIQUIDITY_UNITS = parseUnits(CREATE_MIN_INITIAL_LIQUIDITY_USDC, 6);
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const isZeroAddress = (address: Address) => address.toLowerCase() === ZERO_ADDRESS;
 
 type AbiEntry = { type?: string; name?: string };
 export type ChainRuntimeMode = "local" | "arc-testnet";
@@ -655,7 +657,7 @@ function actorReadAddress(deployment: AppDeployment, actors: DevActor[], actorId
     return actorAddress(deploymentActor);
   }
 
-  return "0x0000000000000000000000000000000000000000";
+  return ZERO_ADDRESS;
 }
 
 function actorIsResolver(deployment: AppDeployment, actor: DevActor | undefined, actorAddressValue: Address) {
@@ -957,6 +959,24 @@ async function readLpPosition(
   const decimals = deployment.contracts.usdc.decimals;
   const publicClient = publicClientFor(deployment);
 
+  if (isZeroAddress(actorAddress)) {
+    const totalShares = await publicClient.readContract({
+      address: marketAddress,
+      abi: iknowMarketAbi,
+      functionName: "totalLpShares",
+    });
+
+    return {
+      marketId,
+      marketQuestion: readModel?.question ?? market.question,
+      lpShares: "0 LP",
+      pendingFees: "0 USDC",
+      totalLpShares: `${displayUnits(totalShares, decimals)} LP`,
+      lpSharesRaw: "0",
+      pendingFeesRaw: "0",
+    };
+  }
+
   const [shares, pending, totalShares, accLpFeePerShare, lpFeeDebt, lpFeePrecision] = await Promise.all([
     publicClient.readContract({
       address: marketAddress,
@@ -1020,6 +1040,7 @@ async function readMarketLifecycle(
   const marketAddress = market.address as Address;
   const decimals = deployment.contracts.usdc.decimals;
   const publicClient = publicClientFor(deployment);
+  const canReadActorBalances = !isZeroAddress(actorAddressValue);
 
   const [
     state,
@@ -1048,18 +1069,22 @@ async function readMarketLifecycle(
     publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "creatorFeePool" }),
     publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "protocolFeePool" }),
     publicClient.readContract({ address: marketAddress, abi: iknowMarketAbi, functionName: "creationBond" }),
-    publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address as Address,
-      abi: outcomeTokenAbi,
-      functionName: "balanceOf",
-      args: [actorAddressValue, BigInt(market.yesTokenId)],
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address as Address,
-      abi: outcomeTokenAbi,
-      functionName: "balanceOf",
-      args: [actorAddressValue, BigInt(market.noTokenId)],
-    }),
+    canReadActorBalances
+      ? publicClient.readContract({
+          address: deployment.contracts.outcomeToken.address as Address,
+          abi: outcomeTokenAbi,
+          functionName: "balanceOf",
+          args: [actorAddressValue, BigInt(market.yesTokenId)],
+        })
+      : Promise.resolve(0n),
+    canReadActorBalances
+      ? publicClient.readContract({
+          address: deployment.contracts.outcomeToken.address as Address,
+          abi: outcomeTokenAbi,
+          functionName: "balanceOf",
+          args: [actorAddressValue, BigInt(market.noTokenId)],
+        })
+      : Promise.resolve(0n),
     publicClient.getBlock(),
   ]);
   const stateNumber = Number(state);
@@ -1110,6 +1135,7 @@ async function readMarketUserState(
   const marketAddress = market.address as Address;
   const decimals = deployment.contracts.usdc.decimals;
   const publicClient = publicClientFor(deployment);
+  const canReadActorBalances = !isZeroAddress(actorAddressValue);
 
   const [reserves, yesBalance, noBalance, lpPosition] = await Promise.all([
     publicClient.readContract({
@@ -1117,18 +1143,22 @@ async function readMarketUserState(
       abi: iknowMarketAbi,
       functionName: "reserves",
     }),
-    publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address,
-      abi: outcomeTokenAbi,
-      functionName: "balanceOf",
-      args: [actorAddressValue, BigInt(market.yesTokenId)],
-    }),
-    publicClient.readContract({
-      address: deployment.contracts.outcomeToken.address,
-      abi: outcomeTokenAbi,
-      functionName: "balanceOf",
-      args: [actorAddressValue, BigInt(market.noTokenId)],
-    }),
+    canReadActorBalances
+      ? publicClient.readContract({
+          address: deployment.contracts.outcomeToken.address,
+          abi: outcomeTokenAbi,
+          functionName: "balanceOf",
+          args: [actorAddressValue, BigInt(market.yesTokenId)],
+        })
+      : Promise.resolve(0n),
+    canReadActorBalances
+      ? publicClient.readContract({
+          address: deployment.contracts.outcomeToken.address,
+          abi: outcomeTokenAbi,
+          functionName: "balanceOf",
+          args: [actorAddressValue, BigInt(market.noTokenId)],
+        })
+      : Promise.resolve(0n),
     readLpPosition(maybeDeployment, actors, markets, actorId, marketId),
   ]);
   const [yesReserve, noReserve] = reserves;
