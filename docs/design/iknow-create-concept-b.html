@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iknow create concept b</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        --bg: #f4f1ea;
+        --ink: #1d1b18;
+        --muted: #776f65;
+        --line: #ddd3c3;
+        --card: #fffdf8;
+        --card-2: #f9f4eb;
+        --nav-bg: rgba(255, 253, 248, 0.62);
+        --nav-active-text: #fffdf8;
+        --primary: #d8b85a;
+        --primary-ink: #211b09;
+        --yes: #6d9f63;
+        --yes-bg: #edf6e8;
+        --yes-line: #d3e7c9;
+        --no: #d9766d;
+        --no-bg: #fbebe9;
+        --no-line: #f0d1ce;
+        --receipt: #8f7d66;
+        --receipt-bg: #f1eadf;
+        --mascot-bg: #fff8e9;
+        --mascot-shadow: #d7c8ad;
+        --input-bg: #fffaf1;
+        --inverted-text: #fffdf8;
+        --inverted-muted: #d8cdbb;
+        --shadow: 0 18px 45px rgba(69, 54, 35, 0.12);
+        --soft-shadow: 0 10px 28px rgba(69, 54, 35, 0.08);
+      }
+
+      body:has(#theme-toggle:checked) {
+        --bg: #1b1916;
+        --ink: #f4f1ea;
+        --muted: #b3aa9d;
+        --line: #403a33;
+        --card: #26231f;
+        --card-2: #302b25;
+        --nav-bg: rgba(38, 35, 31, 0.72);
+        --nav-active-text: #1d1b18;
+        --primary: #d9bd72;
+        --primary-ink: #211b09;
+        --yes: #b7c89c;
+        --yes-bg: #2c3226;
+        --yes-line: #444d3d;
+        --no: #d79a93;
+        --no-bg: #332725;
+        --no-line: #4f3834;
+        --receipt: #d1c3ad;
+        --receipt-bg: #342f28;
+        --mascot-bg: #efe3c9;
+        --mascot-shadow: #675b49;
+        --input-bg: #1f1c18;
+        --inverted-text: #1d1b18;
+        --inverted-muted: #5d513c;
+        --shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+        --soft-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+      }
+
+      html {
+        background: var(--bg);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, rgba(216, 184, 90, 0.1), transparent 330px),
+          var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      label {
+        cursor: pointer;
+      }
+
+      .topbar,
+      .main {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 20px;
+        padding-bottom: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .mascot {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        border: 2px solid var(--ink);
+        border-radius: 14px 14px 18px 18px;
+        background: var(--mascot-bg);
+        box-shadow: 5px 5px 0 var(--mascot-shadow);
+        flex: 0 0 auto;
+      }
+
+      .mascot::before,
+      .mascot::after {
+        content: "";
+        position: absolute;
+        top: 15px;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--ink);
+      }
+
+      .mascot::before {
+        left: 12px;
+      }
+
+      .mascot::after {
+        right: 12px;
+      }
+
+      .handle {
+        position: absolute;
+        right: -12px;
+        top: 13px;
+        width: 14px;
+        height: 16px;
+        border: 2px solid var(--ink);
+        border-left: 0;
+        border-radius: 0 10px 10px 0;
+      }
+
+      .smirk {
+        position: absolute;
+        left: 13px;
+        bottom: 11px;
+        width: 17px;
+        height: 7px;
+        border-bottom: 2px solid var(--ink);
+        border-radius: 0 0 20px 20px;
+        transform: rotate(-5deg);
+      }
+
+      .brand-text {
+        display: grid;
+        line-height: 1.1;
+      }
+
+      .brand-text strong {
+        font-size: 20px;
+      }
+
+      .brand-text span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nav {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--nav-bg);
+      }
+
+      .nav button,
+      .theme-label,
+      .wallet {
+        min-height: 36px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 800;
+        padding: 0 14px;
+      }
+
+      .nav button.active {
+        background: var(--ink);
+        color: var(--nav-active-text);
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .wallet,
+      .theme-label {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        background: var(--card);
+        font-size: 13px;
+      }
+
+      #theme-toggle {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .theme-label::before {
+        content: "Light";
+      }
+
+      body:has(#theme-toggle:checked) .theme-label::before {
+        content: "Dark";
+      }
+
+      .main {
+        padding-top: 18px;
+        padding-bottom: 56px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+        align-items: end;
+        gap: 24px;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--receipt);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 720px;
+        margin-bottom: 12px;
+        font-size: clamp(34px, 5vw, 62px);
+        line-height: 0.96;
+      }
+
+      .hero-text p {
+        max-width: 620px;
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      .quote-card {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--card);
+        box-shadow: var(--soft-shadow);
+        padding: 18px;
+      }
+
+      .quote-card p {
+        margin-bottom: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .quote-card strong {
+        display: block;
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .desk {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr) 300px;
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel,
+      .draft,
+      .funding {
+        border: 1px solid var(--line);
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+
+      .panel {
+        border-radius: 24px;
+        padding: 18px;
+      }
+
+      .panel h2,
+      .funding h2 {
+        margin-bottom: 14px;
+        font-size: 17px;
+      }
+
+      .idea-box {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .idea-box label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      textarea {
+        min-height: 132px;
+        resize: none;
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--input-bg);
+        color: var(--ink);
+        padding: 14px;
+        line-height: 1.45;
+        outline: 0;
+      }
+
+      textarea:focus {
+        border-color: var(--receipt);
+        box-shadow: 0 0 0 4px rgba(216, 184, 90, 0.18);
+      }
+
+      .primary-btn,
+      .secondary-btn {
+        width: 100%;
+        min-height: 44px;
+        border-radius: 999px;
+        font-weight: 900;
+      }
+
+      .primary-btn {
+        border: 0;
+        background: var(--primary);
+        color: var(--primary-ink);
+        box-shadow: inset 0 -2px 0 rgba(33, 27, 9, 0.18);
+      }
+
+      .secondary-btn {
+        border: 1px solid var(--line);
+        background: var(--card-2);
+        color: var(--ink);
+      }
+
+      .status-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .status-item {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        align-items: start;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--card-2);
+      }
+
+      .status-icon {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--receipt-bg);
+        color: var(--receipt);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .status-item.active .status-icon {
+        background: var(--primary);
+        color: var(--primary-ink);
+      }
+
+      .status-item strong {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 13px;
+      }
+
+      .status-item span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .draft {
+        overflow: hidden;
+        border-radius: 28px;
+      }
+
+      .draft-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(135deg, rgba(216, 184, 90, 0.15), transparent 58%),
+          var(--card);
+      }
+
+      .draft-header h2 {
+        margin-bottom: 8px;
+        font-size: clamp(25px, 3vw, 36px);
+        line-height: 1.08;
+      }
+
+      .draft-header p {
+        margin-bottom: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .confidence {
+        flex: 0 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--card-2);
+        padding: 12px 14px;
+        text-align: right;
+      }
+
+      .confidence span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .confidence strong {
+        display: block;
+        font-size: 24px;
+      }
+
+      .draft-body {
+        display: grid;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      .outcomes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .outcome {
+        min-height: 112px;
+        border-radius: 22px;
+        padding: 16px;
+      }
+
+      .outcome.yes {
+        border: 1px solid var(--yes-line);
+        background: var(--yes-bg);
+      }
+
+      .outcome.no {
+        border: 1px solid var(--no-line);
+        background: var(--no-bg);
+      }
+
+      .outcome span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        margin-bottom: 14px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--card);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .outcome.yes span {
+        color: var(--yes);
+      }
+
+      .outcome.no span {
+        color: var(--no);
+      }
+
+      .outcome strong {
+        display: block;
+        font-size: 16px;
+        line-height: 1.3;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--card-2);
+        padding: 16px;
+      }
+
+      .note.wide {
+        grid-column: 1 / -1;
+      }
+
+      .note h3 {
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .note p,
+      .note li {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .note p {
+        margin-bottom: 0;
+      }
+
+      .note ul {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .research-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .source-chip {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--card);
+        padding: 12px;
+      }
+
+      .source-chip span {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--receipt);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .source-chip strong {
+        display: block;
+        font-size: 13px;
+        line-height: 1.3;
+      }
+
+      .funding {
+        border-radius: 24px;
+        padding: 18px;
+      }
+
+      .funding-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .funding-row span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .funding-row strong {
+        text-align: right;
+      }
+
+      .funding-row:last-of-type {
+        border-bottom: 0;
+        margin-bottom: 14px;
+      }
+
+      .money-input {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--input-bg);
+        padding: 12px 14px;
+      }
+
+      .money-input span {
+        color: var(--muted);
+        font-weight: 900;
+      }
+
+      .money-input strong {
+        font-size: 24px;
+      }
+
+      .assurance {
+        margin-top: 14px;
+        border-radius: 18px;
+        background: var(--receipt-bg);
+        color: var(--muted);
+        padding: 12px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .assurance strong {
+        color: var(--ink);
+      }
+
+      @media (max-width: 980px) {
+        .hero,
+        .desk {
+          grid-template-columns: 1fr;
+        }
+
+        .desk {
+          align-items: stretch;
+        }
+
+        .panel {
+          order: 1;
+        }
+
+        .draft {
+          order: 2;
+        }
+
+        .funding {
+          order: 3;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .topbar {
+          flex-wrap: wrap;
+        }
+
+        .nav {
+          order: 3;
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .nav button {
+          flex: 1;
+          padding: 0 10px;
+        }
+
+        .wallet {
+          display: none;
+        }
+
+        .topbar,
+        .main {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        h1 {
+          font-size: 38px;
+        }
+
+        .draft-header,
+        .outcomes,
+        .section-grid,
+        .research-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .draft-header {
+          display: grid;
+        }
+
+        .confidence {
+          width: 100%;
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <input id="theme-toggle" type="checkbox" aria-label="Toggle dark mode" />
+
+    <header class="topbar">
+      <div class="brand" aria-label="iknow">
+        <div class="mascot" aria-hidden="true">
+          <span class="handle"></span>
+          <span class="smirk"></span>
+        </div>
+        <div class="brand-text">
+          <strong>iknow</strong>
+          <span>Create</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <button type="button">Home</button>
+        <button class="active" type="button">Create</button>
+        <button type="button">Profile</button>
+      </nav>
+
+      <div class="actions">
+        <label class="theme-label" for="theme-toggle"></label>
+        <button class="wallet" type="button">$128.40</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="hero" aria-label="Research Desk introduction">
+        <div class="hero-text">
+          <p class="eyebrow">Research Desk</p>
+          <h1>Say the market idea. iknow does the eyebrow raise.</h1>
+          <p>
+            Drop a hunch in plain English. iknow checks the shape of the event, tightens the result
+            rules, and hands back a market draft that sounds like it knows what it is doing.
+          </p>
+        </div>
+
+        <aside class="quote-card" aria-label="Example idea">
+          <p>Market idea</p>
+          <strong>Will Apple announce a foldable iPhone before September 30, 2026?</strong>
+        </aside>
+      </section>
+
+      <section class="desk" aria-label="Market creation desk">
+        <aside class="panel" aria-label="Idea and research status">
+          <h2>Start with intent</h2>
+          <div class="idea-box">
+            <label for="market-idea">Market idea</label>
+            <textarea id="market-idea">Will Apple announce a foldable iPhone before September 30, 2026?</textarea>
+            <button class="primary-btn" type="button">Build market draft</button>
+          </div>
+
+          <div class="status-list" aria-label="iknow progress">
+            <div class="status-item">
+              <span class="status-icon">1</span>
+              <div>
+                <strong>Understood the event</strong>
+                <span>Product announcement, deadline, and expected public evidence are clear.</span>
+              </div>
+            </div>
+            <div class="status-item active">
+              <span class="status-icon">2</span>
+              <div>
+                <strong>Checking the result path</strong>
+                <span>Looking for sources people will trust after the date passes.</span>
+              </div>
+            </div>
+            <div class="status-item">
+              <span class="status-icon">3</span>
+              <div>
+                <strong>Drafting rules</strong>
+                <span>Turning the idea into Yes, No, invalid, and settlement language.</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <article class="draft" aria-label="Selected market draft">
+          <header class="draft-header">
+            <div>
+              <p class="eyebrow">Selected market</p>
+              <h2>Will Apple announce a foldable iPhone before September 30, 2026?</h2>
+              <p>
+                This market resolves on whether Apple publicly announces an iPhone model with a
+                foldable display on or before September 30, 2026.
+              </p>
+            </div>
+            <div class="confidence">
+              <span>Draft clarity</span>
+              <strong>92%</strong>
+            </div>
+          </header>
+
+          <div class="draft-body">
+            <div class="outcomes" aria-label="Outcomes">
+              <div class="outcome yes">
+                <span>Yes</span>
+                <strong>Apple announces a foldable iPhone model by the deadline.</strong>
+              </div>
+              <div class="outcome no">
+                <span>No</span>
+                <strong>No qualifying foldable iPhone announcement happens by then.</strong>
+              </div>
+            </div>
+
+            <div class="section-grid">
+              <section class="note">
+                <h3>Rules</h3>
+                <ul>
+                  <li>The announcement must come from Apple or an official Apple event.</li>
+                  <li>The product must be an iPhone, not only an iPad, patent, or rumor.</li>
+                  <li>The display must be described or shown as foldable.</li>
+                </ul>
+              </section>
+
+              <section class="note">
+                <h3>Where to check the result</h3>
+                <p>Apple Newsroom, Apple event video, or a dated Apple press release.</p>
+              </section>
+
+              <section class="note">
+                <h3>Invalid conditions</h3>
+                <p>
+                  The market can be invalid if Apple removes public evidence, the date is ambiguous,
+                  or the announcement cannot be verified from official materials.
+                </p>
+              </section>
+
+              <section class="note">
+                <h3>Why this works</h3>
+                <p>
+                  The question has a named actor, a concrete action, a deadline, and sources that can
+                  settle the outcome without needing vibes in a courtroom robe.
+                </p>
+              </section>
+
+              <section class="note wide">
+                <h3>Research notes</h3>
+                <div class="research-strip">
+                  <div class="source-chip">
+                    <span>Actor</span>
+                    <strong>Apple is the required announcer.</strong>
+                  </div>
+                  <div class="source-chip">
+                    <span>Deadline</span>
+                    <strong>September 30, 2026, end of day.</strong>
+                  </div>
+                  <div class="source-chip">
+                    <span>Evidence</span>
+                    <strong>Official Apple materials settle the result.</strong>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <aside class="funding" aria-label="Funding and create controls">
+          <h2>Fund and create</h2>
+
+          <div class="funding-row">
+            <span>Question</span>
+            <strong>Ready</strong>
+          </div>
+          <div class="funding-row">
+            <span>Rules</span>
+            <strong>4 checks</strong>
+          </div>
+          <div class="funding-row">
+            <span>Where to check the result</span>
+            <strong>Apple sources</strong>
+          </div>
+
+          <div class="idea-box">
+            <label>Money to start the market</label>
+            <div class="money-input">
+              <span>$</span>
+              <strong>25.00</strong>
+            </div>
+          </div>
+
+          <div class="idea-box">
+            <label>Safety deposit</label>
+            <div class="money-input">
+              <span>$</span>
+              <strong>5.00</strong>
+            </div>
+          </div>
+
+          <button class="primary-btn" type="button">Create market</button>
+          <button class="secondary-btn" type="button" style="margin-top: 10px">Search markets</button>
+
+          <p class="assurance">
+            <strong>iknow take:</strong> clean enough to publish. Tiny smug nod included at no extra
+            charge.
+          </p>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

@@ -23,22 +23,14 @@ export const iknowMarketFactoryAbi = [
         "name": "protocolFeeRecipient_",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "DEFAULT_TOTAL_FEE_BPS",
-    "inputs": [],
-    "outputs": [
+      },
       {
-        "name": "",
+        "name": "defaultChallengeWindow_",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -97,32 +89,6 @@ export const iknowMarketFactoryAbi = [
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "defaultChallengeWindow",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "defaultFeeBps",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2739,7 +2705,7 @@ export const outcomeTokenAbi = [
 
 export const deployedAddresses = {
   arcTestnet: {
-    marketFactory: undefined,
-    outcomeToken: undefined,
+    marketFactory: "0x023290ce90BbB56160d847a3124B60743d213719",
+    outcomeToken: "0x25765F406Fb84183E361c936Cf77378C51cfAde4",
   },
 } as const;

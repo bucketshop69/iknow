@@ -76,6 +76,13 @@ Creator capital should be split conceptually:
 
 The UX may combine these in one creation flow, but the protocol and docs should keep the distinction clear.
 
+Current MVP product floors:
+
+- Minimum creation bond / safety deposit: **5 USDC**.
+- Minimum initial liquidity / money to start the market: **10 USDC**.
+
+These floors are enforced in the web app, API draft/create flow, and factory contract source. Existing local or testnet deployments must be redeployed before their on-chain bytecode reflects the same rule.
+
 ## Participants
 
 ### Creator

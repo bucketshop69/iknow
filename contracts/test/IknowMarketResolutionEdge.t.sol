@@ -18,7 +18,7 @@ contract IknowMarketResolutionEdgeTest is IknowTestBase {
         super.setUp();
 
         outcomeToken = new OutcomeToken("ipfs://iknow/{id}.json");
-        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury);
+        factory = new IknowMarketFactory(IERC20(address(usdc)), outcomeToken, resolver, treasury, 1 hours);
         outcomeToken.transferOwnership(address(factory));
 
         closeTime = block.timestamp + 7 days;

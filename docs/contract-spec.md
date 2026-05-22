@@ -105,6 +105,8 @@ Market creation initializes immutable or governance-controlled market parameters
 - Initial liquidity must satisfy the implementation's minimum, if one exists.
 - Creator bond and initial liquidity must be accounted separately, even when transferred in the same transaction.
 
+Current MVP policy sets a 5 USDC minimum creator bond and a 10 USDC minimum initial liquidity amount. This is enforced in the web app, API draft/create flow, and factory contract source. Existing local or testnet deployments must be redeployed before their on-chain bytecode reflects the same rule.
+
 If initial liquidity is provided, the market mints complete sets and deposits balanced inventory into the AMM according to the initial price assumptions.
 
 ### 3. Open Trading

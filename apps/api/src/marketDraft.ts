@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
-import { marketDraftResponseSchema, marketDraftSchema } from "@iknow/shared";
+import {
+  CREATE_MIN_CREATION_BOND_USDC,
+  CREATE_MIN_INITIAL_LIQUIDITY_USDC,
+  marketDraftResponseSchema,
+  marketDraftSchema,
+} from "@iknow/shared";
 
 const ONE_USDC = 1_000_000n;
-const DEFAULT_CREATION_BOND = 100n * ONE_USDC;
-const DEFAULT_INITIAL_LIQUIDITY = 1_000n * ONE_USDC;
+const MIN_CREATION_BOND = BigInt(CREATE_MIN_CREATION_BOND_USDC) * ONE_USDC;
+const MIN_INITIAL_LIQUIDITY = BigInt(CREATE_MIN_INITIAL_LIQUIDITY_USDC) * ONE_USDC;
+const DEFAULT_CREATION_BOND = MIN_CREATION_BOND;
+const DEFAULT_INITIAL_LIQUIDITY = MIN_INITIAL_LIQUIDITY;
 const DEFAULT_RESOLUTION_SOURCE = "Creator-provided evidence with resolver verification.";
 const DEFAULT_INVALID_CONDITIONS = [
   "The question cannot be objectively resolved from the listed resolution source.",
@@ -15,6 +22,8 @@ type DraftRequest = {
   closeTime?: unknown;
   resolutionSource?: unknown;
   invalidConditions?: unknown;
+  creationBond?: unknown;
+  initialLiquidity?: unknown;
 };
 
 export function createMarketDraftResponse(body: DraftRequest) {
@@ -43,8 +52,13 @@ export function createMarketDraftResponse(body: DraftRequest) {
     specHash,
     metadataURI: `urn:iknow:market:${specHash}`,
     closeTime: closeTimeSeconds,
-    creationBond: DEFAULT_CREATION_BOND.toString(),
-    initialLiquidity: DEFAULT_INITIAL_LIQUIDITY.toString(),
+    creationBond: _parseUsdcUnits(body.creationBond, DEFAULT_CREATION_BOND, MIN_CREATION_BOND, "Safety deposit").toString(),
+    initialLiquidity: _parseUsdcUnits(
+      body.initialLiquidity,
+      DEFAULT_INITIAL_LIQUIDITY,
+      MIN_INITIAL_LIQUIDITY,
+      "Money to start the market",
+    ).toString(),
   };
 
   return marketDraftResponseSchema.parse({ draft, specHashInput, factoryArgs });
@@ -56,4 +70,30 @@ function _defaultCloseTime() {
 
 function _specHash(input: unknown) {
   return `0x${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
+}
+
+function _parseUsdcUnits(value: unknown, fallback: bigint, minimum: bigint, label: string) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const text = String(value).trim();
+  if (!/^\d+(\.\d{1,6})?$/.test(text)) {
+    throw new Error("USDC amounts must be positive numbers with at most 6 decimal places");
+  }
+
+  const [whole, fraction = ""] = text.split(".");
+  const parsed = BigInt(whole) * ONE_USDC + BigInt(fraction.padEnd(6, "0"));
+  if (parsed < minimum) {
+    throw new Error(`${label} must be at least ${_formatUsdcUnits(minimum)} USDC`);
+  }
+
+  return parsed;
+}
+
+function _formatUsdcUnits(value: bigint) {
+  const whole = value / ONE_USDC;
+  const fraction = (value % ONE_USDC).toString().padStart(6, "0").replace(/0+$/g, "");
+
+  return `${whole}${fraction ? `.${fraction}` : ""}`;
 }

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "generatedAtBlockTimestamp": 1779451103,
+  "chain": {
+    "id": 5042002,
+    "name": "Arc Testnet",
+    "rpcUrl": "https://rpc.testnet.arc.network"
+  },
+  "contracts": {
+    "usdc": {
+      "address": "0x3600000000000000000000000000000000000000",
+      "decimals": 6
+    },
+    "outcomeToken": {
+      "address": "0x25765F406Fb84183E361c936Cf77378C51cfAde4"
+    },
+    "iknowMarketFactory": {
+      "address": "0x023290ce90BbB56160d847a3124B60743d213719",
+      "defaultChallengeWindow": 120,
+      "indexStartBlock": 43500000
+    }
+  },
+  "actors": {
+    "deployer": "0xc9BEbdb206959E28E608863f15fEaAc1254551CF",
+    "resolver": "0xc9BEbdb206959E28E608863f15fEaAc1254551CF",
+    "protocolFeeRecipient": "0xc9BEbdb206959E28E608863f15fEaAc1254551CF"
+  },
+  "markets": [
+    {
+      "id": "will-bitcoin-hit-150k-by-june-30-2026-577376",
+      "address": "0xc6B75c6df25F59569b0935B4E7d577a9a17cA862",
+      "specHash": "0xfec889b0f9f1148e07320072cf0988b8e5df620726774a838eb0d57f9ac7cead",
+      "metadataURI": "urn:iknow:market:0xfec889b0f9f1148e07320072cf0988b8e5df620726774a838eb0d57f9ac7cead",
+      "question": "Will Bitcoin hit $150k by June 30, 2026?",
+      "closeTime": 1782878400,
+      "resolutionSource": "Otherwise, this market will resolve to \"No.\" The resolution source for this market is Binance, specifically the BTC/USDT \"High\" prices available at https://www.binance.com/en/trade/BTC_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from the market details.",
+        "Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "573655",
+        "url": "https://polymarket.com/market/will-bitcoin-hit-150k-by-june-30-2026",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+        "question": "Will Bitcoin hit $150k by June 30, 2026?",
+        "closeTime": "2026-07-01T04:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "18376749345176789867797970031369537584240103808052084669271388105753685784374",
+      "noTokenId": "64179059127808024785581752759509094222488229691919899268895195478329819653008"
+    },
+    {
+      "id": "arc-smoke-test",
+      "address": "0xcbBf1B7035A1560383e21aB684A7DD7d40f5605B",
+      "specHash": "0x650e7ff77c50d09442df3b360c31d53996046c6ea60ffb62a0e4178c9461f350",
+      "metadataURI": "urn:iknow:market:arc-smoke-test",
+      "question": "Will this Arc testnet smoke market resolve YES?",
+      "closeTime": 1779451227,
+      "resolutionSource": "Manual smoke-test source controlled by the iknow demo resolver.",
+      "invalidConditions": [
+        "Resolve INVALID only if the test market was created with malformed metadata."
+      ],
+      "sourceIdea": {
+        "provider": "iknow-arc-testnet-smoke",
+        "externalId": "arc-smoke-test",
+        "question": "Will this Arc testnet smoke market resolve YES?",
+        "closeTime": "2026-05-22T12:00:27.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "56943764493574353308075556131873563367598742151235724067817575410364045940717",
+      "noTokenId": "105530304974146273377031955993531068997362033177102049160638293462039931354880"
+    }
+  ]
+}

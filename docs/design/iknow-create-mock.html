@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iknow create mock</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --ink: #1d1b18;
+        --muted: #776f65;
+        --line: #ddd3c3;
+        --card: #fffdf8;
+        --card-2: #f9f4eb;
+        --nav-bg: rgba(255, 253, 248, 0.62);
+        --nav-active-text: #fffdf8;
+        --primary: #d8b85a;
+        --primary-ink: #211b09;
+        --yes: #6d9f63;
+        --yes-bg: #edf6e8;
+        --yes-line: #d3e7c9;
+        --no: #d9766d;
+        --no-bg: #fbebe9;
+        --no-line: #f0d1ce;
+        --receipt: #8f7d66;
+        --receipt-bg: #f1eadf;
+        --mascot-bg: #fff8e9;
+        --mascot-shadow: #d7c8ad;
+        --input-bg: #fffaf1;
+        --selected-text: #fffdf8;
+        --selected-muted: #d8cdbb;
+        --shadow: 0 18px 45px rgba(69, 54, 35, 0.12);
+        --text-shadow: 0 1px 0 rgba(255, 253, 248, 0.72), 0 8px 18px rgba(69, 54, 35, 0.08);
+      }
+
+      [data-theme="dark"] {
+        --bg: #1b1916;
+        --ink: #f4f1ea;
+        --muted: #b3aa9d;
+        --line: #403a33;
+        --card: #26231f;
+        --card-2: #302b25;
+        --nav-bg: rgba(38, 35, 31, 0.72);
+        --nav-active-text: #1d1b18;
+        --primary: #d9bd72;
+        --primary-ink: #211b09;
+        --yes: #b7c89c;
+        --yes-bg: #2c3226;
+        --yes-line: #444d3d;
+        --no: #d79a93;
+        --no-bg: #332725;
+        --no-line: #4f3834;
+        --receipt: #d1c3ad;
+        --receipt-bg: #342f28;
+        --mascot-bg: #efe3c9;
+        --mascot-shadow: #675b49;
+        --input-bg: #1f1c18;
+        --selected-text: #1d1b18;
+        --selected-muted: #5d513c;
+        --shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+        --text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), 0 10px 22px rgba(0, 0, 0, 0.24);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .topbar,
+      .main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding-left: 24px;
+        padding-right: 24px;
+        width: 100%;
+      }
+
+      .topbar {
+        padding-top: 20px;
+        padding-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .mascot {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px 14px 18px 18px;
+        background: var(--mascot-bg);
+        border: 2px solid var(--ink);
+        position: relative;
+        box-shadow: 5px 5px 0 var(--mascot-shadow);
+      }
+
+      .mascot::before,
+      .mascot::after {
+        content: "";
+        position: absolute;
+        top: 15px;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--ink);
+      }
+
+      .mascot::before {
+        left: 12px;
+      }
+
+      .mascot::after {
+        right: 12px;
+      }
+
+      .handle {
+        position: absolute;
+        right: -12px;
+        top: 13px;
+        width: 14px;
+        height: 16px;
+        border: 2px solid var(--ink);
+        border-left: 0;
+        border-radius: 0 10px 10px 0;
+      }
+
+      .smirk {
+        position: absolute;
+        left: 13px;
+        bottom: 11px;
+        width: 17px;
+        height: 7px;
+        border-bottom: 2px solid var(--ink);
+        border-radius: 0 0 20px 20px;
+        transform: rotate(-5deg);
+      }
+
+      .brand-text {
+        display: grid;
+        line-height: 1.1;
+      }
+
+      .brand-text strong {
+        font-size: 20px;
+      }
+
+      .brand-text span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nav {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        background: var(--nav-bg);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+      }
+
+      .nav button,
+      .theme-toggle,
+      .wallet {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        border-radius: 999px;
+        min-height: 36px;
+        padding: 0 14px;
+        font-weight: 800;
+      }
+
+      .nav button.active {
+        background: var(--ink);
+        color: var(--nav-active-text);
+      }
+
+      .theme-toggle,
+      .wallet {
+        border: 1px solid var(--line);
+        background: var(--card);
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .main {
+        padding-top: 16px;
+        padding-bottom: 56px;
+      }
+
+      .intro,
+      .benefits,
+      .panel,
+      .draft {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+      }
+
+      .intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 16px;
+        padding: 20px 24px 22px;
+      }
+
+      .kicker {
+        margin: 0 0 6px;
+        color: var(--receipt);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 3.8vw, 44px);
+        line-height: 1;
+        text-shadow: var(--text-shadow);
+      }
+
+      .intro p,
+      .benefit p,
+      .market-result p,
+      .field p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .intro p {
+        margin: 0;
+        max-width: 780px;
+        font-size: 16px;
+      }
+
+      .creator-flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .flow-step {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 11px 14px;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .flow-step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .flow-arrow {
+        align-self: center;
+        color: var(--receipt);
+        font-size: 20px;
+        font-weight: 900;
+      }
+
+      .benefits {
+        margin-top: 20px;
+        padding: 22px;
+        display: grid;
+        grid-template-columns: 260px repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .benefits h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .benefit {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+      }
+
+      .benefit strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .benefit p {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .create-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel {
+        order: 2;
+        padding: 18px;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-bottom: 12px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 23px;
+        text-shadow: var(--text-shadow);
+        white-space: nowrap;
+      }
+
+      .section-head span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .count-pill {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+        justify-self: start;
+        padding: 7px 10px;
+      }
+
+      .search-box {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--input-bg);
+        color: var(--ink);
+        border-radius: 18px;
+        padding: 0 14px;
+        font-weight: 800;
+      }
+
+      input {
+        min-height: 48px;
+        font-size: 16px;
+      }
+
+      textarea {
+        min-height: 76px;
+        padding-top: 13px;
+        resize: vertical;
+        line-height: 1.45;
+      }
+
+      .topic-block {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .topic-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .topic-chip {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--muted);
+        border-radius: 999px;
+        min-height: 34px;
+        padding: 0 12px;
+        font-weight: 900;
+      }
+
+      .topic-chip.active {
+        background: var(--ink);
+        color: var(--selected-text);
+      }
+
+      .result-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .market-result {
+        border: 1px solid var(--line);
+        background: var(--card-2);
+        border-radius: 20px;
+        padding: 13px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .market-result.selected {
+        background: var(--ink);
+        color: var(--selected-text);
+      }
+
+      .market-result.selected p,
+      .market-result.selected .meta {
+        color: var(--selected-muted);
+      }
+
+      .market-result h3 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.25;
+        text-shadow: var(--text-shadow);
+      }
+
+      .market-result p {
+        margin: 6px 0 0;
+        font-size: 14px;
+      }
+
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .meta {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .market-result.selected .meta {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .result-action {
+        justify-self: start;
+      }
+
+      .primary,
+      .secondary {
+        min-height: 46px;
+        border-radius: 16px;
+        padding: 0 16px;
+        font-weight: 900;
+      }
+
+      .primary {
+        border: 0;
+        background: var(--primary);
+        color: var(--primary-ink);
+      }
+
+      .secondary {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+      }
+
+      .draft {
+        overflow: hidden;
+        order: 1;
+        position: sticky;
+        top: 18px;
+      }
+
+      .draft-head {
+        padding: 18px;
+        background: var(--card-2);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .draft-head span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .draft-head h2 {
+        margin: 6px 0 0;
+        font-size: 24px;
+      }
+
+      .draft-body {
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+
+      .field p {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .field-readonly {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.4;
+        margin: 0;
+        padding: 12px 14px;
+      }
+
+      .receipt-note {
+        background: var(--receipt-bg);
+        color: var(--receipt);
+        border-radius: 18px;
+        padding: 13px;
+        font-size: 14px;
+        line-height: 1.45;
+        font-weight: 800;
+      }
+
+      .ready-box {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        display: grid;
+        gap: 10px;
+        padding: 13px;
+      }
+
+      .ready-box strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      .ready-box p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0;
+      }
+
+      .state-track {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .state-pill {
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1.25;
+        padding: 9px 10px;
+      }
+
+      .state-pill.active {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--selected-text);
+      }
+
+      @media (max-width: 920px) {
+        .topbar {
+          flex-wrap: wrap;
+        }
+
+        .nav {
+          order: 3;
+          width: 100%;
+          overflow-x: auto;
+        }
+
+        .create-layout,
+        .benefits {
+          grid-template-columns: 1fr;
+        }
+
+        .creator-flow {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-arrow {
+          transform: rotate(90deg);
+          justify-self: center;
+        }
+
+        .draft {
+          position: static;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .topbar,
+        .main {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .intro,
+        .benefits,
+        .panel,
+        .draft {
+          border-radius: 22px;
+        }
+
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .state-track {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 29px;
+          line-height: 1.05;
+        }
+
+        .intro p {
+          font-size: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mascot" aria-hidden="true">
+            <span class="handle"></span>
+            <span class="smirk"></span>
+          </div>
+          <div class="brand-text">
+            <strong>iknow</strong>
+            <span>calls with receipts</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="Main navigation">
+          <button>Home</button>
+          <button class="active">Create</button>
+          <button>Profile</button>
+        </nav>
+        <div class="actions">
+          <button class="theme-toggle" type="button" aria-label="Toggle color mode">Dark mode</button>
+          <div class="wallet">Arc Testnet</div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="intro">
+          <div>
+            <p class="kicker">I know I can create a market</p>
+            <h1>I know what people should bet on</h1>
+            <p>
+              Start with a market idea, review how the result gets checked, add the first money, and launch it.
+            </p>
+          </div>
+
+          <div class="creator-flow" aria-label="Creator flow">
+            <div class="flow-step">
+              <strong>I find a market idea</strong>
+              <p>Search topics or browse ready-made market rules.</p>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+              <strong>I review the rules</strong>
+              <p>Check the question, deadline, where to verify the result, and edge cases.</p>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+              <strong>I fund and create</strong>
+              <p>Add the first money and create the market on iknow.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="create-layout">
+          <div class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Umm, what I was thinking?</h2>
+                <span>Tell us what market you want to create.</span>
+              </div>
+            </div>
+
+            <div class="search-box">
+              <label for="search">Search markets</label>
+              <input id="search" value="IPL" aria-label="Search markets" />
+            </div>
+
+            <div class="topic-block" aria-label="Browse by topic">
+              <label>Browse by topic</label>
+              <div class="topic-row">
+                <button class="topic-chip active" type="button">Popular</button>
+                <button class="topic-chip" type="button">Crypto</button>
+                <button class="topic-chip" type="button">Fed</button>
+                <button class="topic-chip" type="button">IPL</button>
+                <button class="topic-chip" type="button">Election</button>
+                <button class="topic-chip" type="button">AI</button>
+              </div>
+            </div>
+
+            <div class="result-list">
+              <article class="market-result selected">
+                <div>
+                  <h3>Will Chennai Super Kings beat Sunrisers Hyderabad in their next IPL match?</h3>
+                  <p>Official scorecard decides the result. If the match is abandoned, the market can resolve invalid.</p>
+                </div>
+                <div class="meta-row">
+                  <span class="meta">Selected</span>
+                  <span class="meta">Sports</span>
+                  <span class="meta">Rules ready</span>
+                </div>
+                <button class="primary result-action">Selected</button>
+              </article>
+
+              <article class="market-result">
+                <div>
+                  <h3>Will BTC close above $110k on Friday?</h3>
+                  <p>Price source, closing timestamp, and invalid rules are ready to review.</p>
+                </div>
+                <div class="meta-row">
+                  <span class="meta">Rules ready</span>
+                  <span class="meta">Crypto</span>
+                </div>
+                <button class="secondary result-action">Use this</button>
+              </article>
+
+              <article class="market-result">
+                <div>
+                  <h3>Will Arsenal beat Chelsea in their next league match?</h3>
+                  <p>Official result source, team names, and invalid rules are available.</p>
+                </div>
+                <div class="meta-row">
+                  <span class="meta">Rules ready</span>
+                  <span class="meta">Sports</span>
+                </div>
+                <button class="secondary result-action">Use this</button>
+              </article>
+            </div>
+          </div>
+
+          <aside class="draft">
+            <div class="draft-head">
+              <span>Review before creating</span>
+              <h2>CSK beats SRH</h2>
+            </div>
+            <div class="draft-body">
+              <div class="state-track" aria-label="Review panel states">
+                <span class="state-pill">Select a market to start</span>
+                <span class="state-pill active">Review before creating</span>
+                <span class="state-pill">Create market on iknow</span>
+              </div>
+
+              <div class="field">
+                <label>Selected market</label>
+                <p class="field-readonly">Will Chennai Super Kings beat Sunrisers Hyderabad in their next IPL match?</p>
+              </div>
+
+              <div class="split">
+                <div class="field">
+                  <label>Money to start the market</label>
+                  <input value="1000 USDC" />
+                  <p>The first money available when people join or trade.</p>
+                </div>
+                <div class="field">
+                  <label>Safety deposit</label>
+                  <input value="100 USDC" />
+                  <p>You get it back when the result is clear.</p>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Where to check the result</label>
+                <textarea>Official final scorecard. Fallback sources can be used only if the official source is unavailable.</textarea>
+              </div>
+
+              <div class="field">
+                <label>Invalid conditions</label>
+                <textarea>Match is abandoned, teams do not match, or no final result is available within the review window.</textarea>
+              </div>
+
+              <div class="receipt-note">
+                When the market ends, iknow agents check these details and mark it Yes, No, or Invalid.
+              </div>
+
+              <button class="primary">Review details</button>
+
+              <div class="ready-box">
+                <div>
+                  <strong>Ready to create</strong>
+                  <p>You will provide 1,000 USDC to start the market and keep a 100 USDC safety deposit.</p>
+                </div>
+                <button class="primary">Create market on iknow</button>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <aside class="benefits">
+          <h2>Why create?</h2>
+          <div class="benefit">
+            <strong>You put the first money in</strong>
+            <p>Choose how much USDC you want to make available when the market opens.</p>
+          </div>
+          <div class="benefit">
+            <strong>People can join your market</strong>
+            <p>Once created, the market appears on iknow for others to take a side or trade.</p>
+          </div>
+          <div class="benefit">
+            <strong>The rules are ready to review</strong>
+            <p>The idea fills in the question, deadline, result source, and edge cases.</p>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <script>
+      const root = document.documentElement;
+      const toggle = document.querySelector(".theme-toggle");
+      const savedTheme = localStorage.getItem("iknow-theme");
+
+      function applyTheme(theme) {
+        root.dataset.theme = theme;
+        toggle.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+        localStorage.setItem("iknow-theme", theme);
+      }
+
+      applyTheme(savedTheme || "light");
+      toggle.addEventListener("click", () => {
+        applyTheme(root.dataset.theme === "dark" ? "light" : "dark");
+      });
+    </script>
+  </body>
+</html>

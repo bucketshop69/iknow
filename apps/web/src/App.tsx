@@ -1,22 +1,34 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import type { DeployedMarket, LocalDeployment, MarketDraftResponse } from "@iknow/shared";
-import { useAccount, useChainId, useConnect, useDisconnect } from "wagmi";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
+  CREATE_MIN_CREATION_BOND_USDC,
+  CREATE_MIN_INITIAL_LIQUIDITY_USDC,
+  type DeployedMarket,
+  type MarketDraftResponse,
+} from "@iknow/shared";
+import { useAccount, useConnect, useDisconnect, useWalletClient } from "wagmi";
+import { createWalletClient, custom, type WalletClient } from "viem";
+import {
+  chainRuntimeMode,
   apiBaseUrl,
   contractSurface,
   createMarketDataSource,
   devActorsFromDeployment,
-  loadLocalDeployment,
+  loadAppDeployment,
+  type AppDeployment,
   type ResolutionOutcomeInput,
   type TradeAction,
   type TradeQuoteReadback,
 } from "./data";
+import { curatedMarketTags, fetchImportCandidates, marketIdeaSuggestions } from "./importMarkets";
+import { iknowTheme } from "./tokens";
+import { arcTestnetChain } from "./wagmi";
 import type {
   CreateDraftInput,
   DevActor,
   EvidenceBriefReadModel,
   MarketLifecycleReadback,
   MarketUserState,
+  MarketImportCandidate,
   MarketReadModel,
   PortfolioReadModel,
   Route,
@@ -29,8 +41,8 @@ const initialRoute = (): Route => {
     return { screen: "create" };
   }
 
-  if (path === "/portfolio") {
-    return { screen: "portfolio" };
+  if (path === "/profile" || path === "/portfolio") {
+    return { screen: "profile" };
   }
 
   const marketMatch = path.match(/^\/markets\/([^/]+)$/);
@@ -46,8 +58,8 @@ const routePath = (route: Route) => {
     return "/create";
   }
 
-  if (route.screen === "portfolio") {
-    return "/portfolio";
+  if (route.screen === "profile") {
+    return "/profile";
   }
 
   if (route.screen === "market") {
@@ -59,6 +71,14 @@ const routePath = (route: Route) => {
 
 const shortAddress = (address?: string) =>
   address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not deployed";
+
+type BrowserEthereumProvider = Parameters<typeof custom>[0];
+
+declare global {
+  interface Window {
+    ethereum?: BrowserEthereumProvider;
+  }
+}
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -73,6 +93,18 @@ const formatDate = (value: string) => {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+};
+
+const formatUsdcUnits = (value: string) => {
+  try {
+    const amount = BigInt(value);
+    const whole = amount / 1_000_000n;
+    const fraction = (amount % 1_000_000n).toString().padStart(6, "0").replace(/0+$/g, "");
+
+    return `${Number(whole).toLocaleString()}${fraction ? `.${fraction}` : ""} USDC`;
+  } catch {
+    return `${value} units`;
+  }
 };
 
 const formatConfidence = (value: number | null) => {
@@ -90,25 +122,140 @@ const toDateTimeLocal = (date: Date) => {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 };
 
+const CREATE_CLOSE_BUFFER_MS = 14 * 24 * 60 * 60 * 1000;
+
+const createClockMs = (deployment?: AppDeployment | null, chainClockMs?: number | null) =>
+  Math.max(Date.now(), (deployment?.generatedAtBlockTimestamp ?? 0) * 1000, chainClockMs ?? 0);
+
+const createDefaultCloseTime = (deployment?: AppDeployment | null, chainClockMs?: number | null) =>
+  toDateTimeLocal(new Date(createClockMs(deployment, chainClockMs) + CREATE_CLOSE_BUFFER_MS));
+
+const normalizeCreateCloseTime = (value: string, deployment?: AppDeployment | null, chainClockMs?: number | null) => {
+  const parsedMs = Date.parse(value);
+  const minimumMs = createClockMs(deployment, chainClockMs) + CREATE_CLOSE_BUFFER_MS;
+
+  return toDateTimeLocal(new Date(Number.isFinite(parsedMs) && parsedMs > minimumMs ? parsedMs : minimumMs));
+};
+
+const createEmptyDraftInput = (deployment?: AppDeployment | null, chainClockMs?: number | null): CreateDraftInput => ({
+  question: "",
+  closeTime: createDefaultCloseTime(deployment, chainClockMs),
+  resolutionSource: "",
+  invalidConditions: "",
+  creationBond: CREATE_MIN_CREATION_BOND_USDC,
+  initialLiquidity: CREATE_MIN_INITIAL_LIQUIDITY_USDC,
+});
+
+const sourceIdeaFromCandidate = (candidate: MarketImportCandidate) => ({
+  provider: candidate.sourceProvider ?? "polymarket",
+  externalId: candidate.externalId,
+  url: candidate.sourceUrl,
+  imageUrl: candidate.imageUrl,
+  question: candidate.question,
+  closeTime: candidate.closeTime,
+});
+
+const sourceIdeaKey = (provider: string | undefined, externalId: string | undefined) => {
+  const normalizedProvider = (provider ?? "polymarket").trim().toLowerCase();
+  const normalizedExternalId = externalId?.trim();
+
+  return normalizedProvider && normalizedExternalId ? `${normalizedProvider}:${normalizedExternalId}` : null;
+};
+
+const sourceIdeaKeyFromCandidate = (candidate: MarketImportCandidate) =>
+  sourceIdeaKey(candidate.sourceProvider, candidate.externalId);
+
+const sourceIdeaKeyFromMarket = (market: MarketReadModel) =>
+  sourceIdeaKey(market.sourceIdea?.provider, market.sourceIdea?.externalId);
+
+const CREATE_IDEA_PAGE_SIZE = 3;
+
+async function readDeploymentBlockClockMs(deployment: AppDeployment) {
+  const response = await fetch(deployment.chain.rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_getBlockByNumber",
+      params: ["latest", false],
+    }),
+  });
+  const payload = (await response.json()) as { result?: { timestamp?: string } };
+  const timestamp = payload.result?.timestamp;
+  if (!timestamp) {
+    return null;
+  }
+
+  return Number(BigInt(timestamp)) * 1000;
+}
+
 function App() {
   const [route, setRoute] = useState<Route>(initialRoute);
-  const [deployment, setDeployment] = useState<LocalDeployment | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    window.localStorage.getItem("iknow-theme") === "dark" ? "dark" : "light",
+  );
+  const account = useAccount();
+  const { data: walletClient } = useWalletClient({ chainId: chainRuntimeMode === "arc-testnet" ? arcTestnetChain.id : undefined });
+  const [connectorWalletClient, setConnectorWalletClient] = useState<WalletClient | undefined>(undefined);
+  const [deployment, setDeployment] = useState<AppDeployment | null>(null);
   const [deploymentState, setDeploymentState] = useState<"loading" | "ready" | "fallback">("loading");
-  const actors = useMemo(() => devActorsFromDeployment(deployment), [deployment]);
-  const [actorId, setActorId] = useState("traderYes");
+  const connectedWalletAddress = account.address as `0x${string}` | undefined;
+  const activeWalletClient = walletClient ?? connectorWalletClient;
+  const actors = useMemo(() => devActorsFromDeployment(deployment, connectedWalletAddress), [deployment, connectedWalletAddress]);
+  const [actorId, setActorId] = useState(chainRuntimeMode === "arc-testnet" ? "wallet" : "traderYes");
   const surface = useMemo(() => contractSurface(deployment), [deployment]);
-  const dataSource = useMemo(() => createMarketDataSource(deployment, actors), [deployment, actors]);
+  const dataSource = useMemo(
+    () =>
+      createMarketDataSource(deployment, actors, {
+        address: connectedWalletAddress,
+        chainId: account.chainId,
+        walletClient: activeWalletClient,
+      }),
+    [account.chainId, activeWalletClient, actors, connectedWalletAddress, deployment],
+  );
   const fallbackMarkets = dataSource.listMarkets();
   const [liveMarkets, setLiveMarkets] = useState<MarketReadModel[] | null>(null);
   const [marketReadbackStatus, setMarketReadbackStatus] = useState<string | null>(null);
   const markets = liveMarkets ?? fallbackMarkets;
   const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
   const [chainRefreshKey, setChainRefreshKey] = useState(0);
+  const themeColors = iknowTheme[theme].color;
+  const appFrameStyle = {
+    "--shell-bg": themeColors.background,
+    "--shell-ink": themeColors.text,
+    "--shell-muted": themeColors.muted,
+    "--shell-soft": themeColors.soft,
+    "--shell-line": themeColors.border,
+    "--shell-card": themeColors.surface,
+    "--shell-card-soft": themeColors.surfaceRaised,
+    "--shell-nav-bg": themeColors.navBackground,
+    "--shell-nav-active-text": themeColors.navActiveText,
+    "--shell-primary": themeColors.primary,
+    "--shell-primary-ink": themeColors.primaryText,
+    "--shell-yes": themeColors.yes,
+    "--shell-yes-bg": themeColors.yesSurface,
+    "--shell-yes-line": themeColors.yesBorder,
+    "--shell-no": themeColors.no,
+    "--shell-no-bg": themeColors.noSurface,
+    "--shell-no-line": themeColors.noBorder,
+    "--shell-receipt": themeColors.receipt,
+    "--shell-receipt-bg": themeColors.receiptSurface,
+    "--shell-mascot-bg": themeColors.mascotSurface,
+    "--shell-mascot-shadow": themeColors.mascotShadow,
+    "--shell-input": themeColors.inputSurface,
+    "--shell-inverted-text": themeColors.invertedText,
+    "--shell-inverted-muted": themeColors.invertedMuted,
+    "--shell-shadow-color": themeColors.shadow,
+    "--shell-control-radius": iknowTheme.radius.control,
+    "--shell-card-radius": iknowTheme.radius.card,
+    "--shell-panel-radius": iknowTheme.radius.panel,
+  } as CSSProperties;
 
   const refreshDeployment = async () => {
     setDeploymentState("loading");
     try {
-      const nextDeployment = await loadLocalDeployment();
+      const nextDeployment = await loadAppDeployment();
       setDeployment(nextDeployment);
       setDeploymentState(nextDeployment ? "ready" : "fallback");
     } catch {
@@ -129,9 +276,13 @@ function App() {
   }, []);
 
   useEffect(() => {
+    window.localStorage.setItem("iknow-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    loadLocalDeployment()
+    loadAppDeployment()
       .then((nextDeployment) => {
         if (cancelled) {
           return;
@@ -149,6 +300,27 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (deployment?.mode === "arc-testnet" && actorId !== "wallet") {
+      setActorId("wallet");
+    }
+  }, [actorId, deployment?.mode]);
+
+  useEffect(() => {
+    if (chainRuntimeMode !== "arc-testnet" || !connectedWalletAddress || !window.ethereum) {
+      setConnectorWalletClient(undefined);
+      return;
+    }
+
+    setConnectorWalletClient(
+      createWalletClient({
+        account: connectedWalletAddress,
+        chain: arcTestnetChain,
+        transport: custom(window.ethereum),
+      }),
+    );
+  }, [connectedWalletAddress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,38 +368,25 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand-block">
-          <strong>iknow</strong>
-          <span>App MVP</span>
-        </div>
-        <nav aria-label="Primary">
-          <button
-            className={route.screen === "markets" || route.screen === "market" ? "active" : ""}
-            onClick={() => navigate({ screen: "markets" })}
-          >
-            Markets
-          </button>
-          <button
-            className={route.screen === "create" ? "active" : ""}
-            onClick={() => navigate({ screen: "create" })}
-          >
-            Create
-          </button>
-          <button
-            className={route.screen === "portfolio" ? "active" : ""}
-            onClick={() => navigate({ screen: "portfolio" })}
-          >
-            Portfolio
-          </button>
-        </nav>
-        <WalletPanel actor={actor} actorId={actorId} actors={actors} onActorChange={setActorId} />
-        <WalletConnectionPanel />
-        <RuntimePanel surface={surface} state={deploymentState} onRefresh={refreshChainReadbacks} />
-      </aside>
+    <div className="app-frame" data-theme={theme} style={appFrameStyle}>
+      <ShellHeader
+        route={route}
+        surface={surface}
+        theme={theme}
+        onNavigate={navigate}
+        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+      />
 
       <main className="workspace">
+        <LocalDemoControls
+          actor={actor}
+          actorId={actorId}
+          actors={actors}
+          deploymentState={deploymentState}
+          surface={surface}
+          onActorChange={setActorId}
+          onRefresh={refreshChainReadbacks}
+        />
         {route.screen === "markets" && (
           <MarketsScreen
             markets={markets}
@@ -246,9 +405,16 @@ function App() {
           />
         )}
         {route.screen === "create" && (
-          <CreateScreen actorId={actorId} dataSource={dataSource} onMarketCreated={addCreatedMarket} />
+          <CreateScreen
+            actorId={actorId}
+            dataSource={dataSource}
+            deployment={deployment}
+            markets={markets}
+            onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
+            onMarketCreated={addCreatedMarket}
+          />
         )}
-        {route.screen === "portfolio" && (
+        {route.screen === "profile" && (
           <PortfolioScreen
             actorId={actorId}
             dataSource={dataSource}
@@ -261,128 +427,288 @@ function App() {
   );
 }
 
-function WalletPanel({
+function ShellHeader({
+  route,
+  surface,
+  theme,
+  onNavigate,
+  onToggleTheme,
+}: {
+  route: Route;
+  surface: ReturnType<typeof contractSurface>;
+  theme: "light" | "dark";
+  onNavigate: (route: Route) => void;
+  onToggleTheme: () => void;
+}) {
+  const isHome = route.screen === "markets" || route.screen === "market";
+
+  return (
+    <header className="shell-topbar">
+      <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "markets" })}>
+        <MugMascot />
+        <span>
+          <strong>iknow</strong>
+          <span>calls with receipts</span>
+        </span>
+      </button>
+
+      <nav className="shell-nav" aria-label="Main navigation">
+        <button className={isHome ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "markets" })}>
+          Home
+        </button>
+        <button
+          className={route.screen === "create" ? "active" : ""}
+          type="button"
+          onClick={() => onNavigate({ screen: "create" })}
+        >
+          Create
+        </button>
+        <button
+          className={route.screen === "profile" ? "active" : ""}
+          type="button"
+          onClick={() => onNavigate({ screen: "profile" })}
+        >
+          Profile
+        </button>
+      </nav>
+
+      <div className="shell-actions">
+        <button className="shell-pill" type="button" onClick={onToggleTheme}>
+          {theme === "dark" ? "Light mode" : "Dark mode"}
+        </button>
+        <span className="shell-pill">{surface.chainName || "Arc Testnet"}</span>
+        <HeaderWalletAction />
+      </div>
+    </header>
+  );
+}
+
+function HeaderWalletAction() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const account = useAccount();
+  const { connect, connectors, isPending, error } = useConnect();
+  const { disconnect } = useDisconnect();
+  const availableConnectors = connectors;
+  const activeAddress = account.address;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    setCopyStatus("idle");
+  }, [activeAddress]);
+
+  useEffect(() => {
+    setConnectError(error?.message ?? null);
+  }, [error]);
+
+  const copyAddress = async () => {
+    if (!activeAddress) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(activeAddress);
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 1600);
+    } catch {
+      setCopyStatus("failed");
+    }
+  };
+
+  if (activeAddress) {
+    return (
+      <div className="wallet-menu" ref={menuRef}>
+        <button
+          className="shell-pill wallet-trigger"
+          type="button"
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          {shortAddress(activeAddress)}
+        </button>
+        {isOpen && (
+          <div className="wallet-popover" role="menu">
+            <span className="wallet-label">Connected wallet</span>
+            <code>{activeAddress}</code>
+            <button className="wallet-menu-action" type="button" role="menuitem" onClick={copyAddress}>
+              {copyStatus === "copied" ? "Copied address" : copyStatus === "failed" ? "Copy failed" : "Copy address"}
+            </button>
+            <button
+              className="wallet-menu-action danger"
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                disconnect();
+                setIsOpen(false);
+              }}
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="wallet-menu" ref={menuRef}>
+      <button
+        className="shell-pill wallet-trigger"
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        disabled={isPending}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        {isPending ? "Connecting" : "Connect"}
+      </button>
+      {isOpen && (
+        <div className="wallet-modal-backdrop" onMouseDown={() => setIsOpen(false)}>
+          <section
+            className="wallet-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wallet-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="wallet-modal-head">
+              <div>
+                <span className="wallet-label">iknow wallet</span>
+                <h2 id="wallet-modal-title">Connect wallet</h2>
+              </div>
+              <button className="wallet-close" type="button" aria-label="Close wallet modal" onClick={() => setIsOpen(false)}>
+                x
+              </button>
+            </div>
+
+            <button
+              className="wallet-passkey-option"
+              type="button"
+              disabled
+            >
+              <strong>Continue with passkey</strong>
+              <span>Circle Modular Wallet on Arc Testnet - coming soon</span>
+            </button>
+
+            <div className="wallet-modal-divider">
+              <span>or</span>
+            </div>
+
+            <div className="wallet-option-list">
+              {availableConnectors.length > 0 ? (
+                availableConnectors.map((connector) => (
+                  <button
+                    className="wallet-menu-action"
+                    type="button"
+                    key={connector.uid}
+                    disabled={isPending}
+                    onClick={() => {
+                      setConnectError(null);
+                      connect({ connector });
+                      setIsOpen(false);
+                    }}
+                  >
+                    {connector.name || "Browser wallet"}
+                  </button>
+                ))
+              ) : (
+                <p>Install a wallet extension or use Chrome with your wallet profile.</p>
+              )}
+            </div>
+
+            {connectError && <p className="wallet-error">{connectError}</p>}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LocalDemoControls({
   actor,
   actorId,
   actors,
+  deploymentState,
+  surface,
   onActorChange,
+  onRefresh,
 }: {
   actor: DevActor;
   actorId: string;
   actors: DevActor[];
-  onActorChange: (actorId: string) => void;
-}) {
-  return (
-    <section className="panel">
-      <div className="panel-title">Local actor</div>
-      <label>
-        Actor
-        <select value={actorId} onChange={(event) => onActorChange(event.target.value)}>
-          {actors.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <dl className="compact-list">
-        <div>
-          <dt>Role</dt>
-          <dd>{actor.role}</dd>
-        </div>
-        <div>
-          <dt>Address</dt>
-          <dd>{shortAddress(actor.address)}</dd>
-        </div>
-        <div>
-          <dt>USDC</dt>
-          <dd>{actor.usdcBalance}</dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
-
-function WalletConnectionPanel() {
-  const account = useAccount();
-  const chainId = useChainId();
-  const { connect, connectors, isPending, error } = useConnect();
-  const { disconnect } = useDisconnect();
-  const injectedConnector = connectors[0];
-
-  return (
-    <section className="panel">
-      <div className="panel-title">Wallet</div>
-      <dl className="compact-list">
-        <div>
-          <dt>Status</dt>
-          <dd>{account.isConnected ? "Connected" : "Not connected"}</dd>
-        </div>
-        <div>
-          <dt>Account</dt>
-          <dd>{shortAddress(account.address)}</dd>
-        </div>
-        <div>
-          <dt>Chain id</dt>
-          <dd>{chainId}</dd>
-        </div>
-      </dl>
-      {account.isConnected ? (
-        <button className="secondary" onClick={() => disconnect()}>
-          Disconnect
-        </button>
-      ) : (
-        <button disabled={!injectedConnector || isPending} onClick={() => injectedConnector && connect({ connector: injectedConnector })}>
-          {isPending ? "Connecting..." : "Connect wallet"}
-        </button>
-      )}
-      {error && <p className="error-text">{error.message}</p>}
-    </section>
-  );
-}
-
-function RuntimePanel({
-  surface,
-  state,
-  onRefresh,
-}: {
+  deploymentState: string;
   surface: ReturnType<typeof contractSurface>;
-  state: string;
+  onActorChange: (actorId: string) => void;
   onRefresh: () => void;
 }) {
+  const isArcTestnet = surface.chainId !== 31337;
+
   return (
-    <section className="panel">
-      <div className="panel-title">Runtime</div>
-      <dl className="compact-list">
-        <div>
-          <dt>Deployment</dt>
-          <dd>{state === "ready" ? "Local artifact loaded" : state === "loading" ? "Loading" : `Fallback (${apiBaseUrl})`}</dd>
-        </div>
-        <div>
-          <dt>Chain</dt>
-          <dd>{surface.chainName}</dd>
-        </div>
-        <div>
-          <dt>Factory</dt>
-          <dd>{shortAddress(surface.marketFactory)}</dd>
-        </div>
-        <div>
-          <dt>Outcome token</dt>
-          <dd>{shortAddress(surface.outcomeToken)}</dd>
-        </div>
-        <div>
-          <dt>ABI functions</dt>
-          <dd>
-            {surface.abiSummary.factoryFunctions.length}/
-            {surface.abiSummary.marketFunctions.length}/
-            {surface.abiSummary.outcomeTokenFunctions.length}
-          </dd>
-        </div>
-      </dl>
-      <button className="secondary" onClick={onRefresh}>
-        Refresh deployment
-      </button>
-    </section>
+    <details className="local-demo-controls">
+      <summary>{isArcTestnet ? "Testnet controls" : "Local demo controls"}</summary>
+      <div className="local-demo-grid">
+        <label>
+          {isArcTestnet ? "Signer" : "Actor"}
+          <select value={actorId} disabled={isArcTestnet} onChange={(event) => onActorChange(event.target.value)}>
+            {actors.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <dl className="compact-list">
+          <div>
+            <dt>Role</dt>
+            <dd>{actor.role}</dd>
+          </div>
+          <div>
+            <dt>Address</dt>
+            <dd>{shortAddress(actor.address)}</dd>
+          </div>
+        </dl>
+        <dl className="compact-list">
+          <div>
+            <dt>Deployment</dt>
+            <dd>{deploymentState === "ready" ? "Loaded" : deploymentState === "loading" ? "Loading" : `Fallback (${apiBaseUrl})`}</dd>
+          </div>
+          <div>
+            <dt>Factory</dt>
+            <dd>{shortAddress(surface.marketFactory)}</dd>
+          </div>
+        </dl>
+        <button className="secondary" type="button" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -399,8 +725,8 @@ function MarketsScreen({
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Markets</p>
-          <h1>Prediction markets</h1>
+          <p className="eyebrow">Home</p>
+          <h1>What do you know today?</h1>
         </div>
         <span className="count-pill">{markets.length} markets</span>
       </header>
@@ -419,9 +745,14 @@ function MarketsScreen({
         </div>
         {markets.map((market) => (
           <article className="market-row" key={market.id}>
-            <div>
-              <h2>{market.question}</h2>
-              <p>Closes {formatDate(market.closeTime)}</p>
+            <div className="market-row-main">
+              {(market.imageUrl || market.sourceIdea?.imageUrl) && (
+                <img className="market-thumb" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
+              )}
+              <div>
+                <h2>{market.question}</h2>
+                <p>Closes {formatDate(market.closeTime)}</p>
+              </div>
             </div>
             <span className="status">{market.status}</span>
             <strong>{Math.round(market.yesPrice * 100)}¢</strong>
@@ -464,9 +795,14 @@ function MarketDetailScreen({
   return (
     <>
       <header className="page-header">
-        <div>
-          <p className="eyebrow">Market detail</p>
-          <h1>{market.question}</h1>
+        <div className="market-detail-title">
+          {(market.imageUrl || market.sourceIdea?.imageUrl) && (
+            <img className="market-detail-image" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
+          )}
+          <div>
+            <p className="eyebrow">Market detail</p>
+            <h1>{market.question}</h1>
+          </div>
         </div>
         <button className="secondary" onClick={onBack}>
           Back
@@ -710,7 +1046,7 @@ function EvidenceBriefView({ brief }: { brief: EvidenceBriefReadModel }) {
       </dl>
 
       <div className="evidence-columns">
-        <EvidenceList title="Facts" emptyLabel="No facts returned.">
+        <EvidenceList title="Agent reasoning" emptyLabel="No reasoning returned.">
           {brief.facts.map((fact) => (
             <li key={`${fact.label}-${fact.value}`}>
               <strong>{fact.label}</strong>
@@ -1155,23 +1491,95 @@ function MarketActionPanel({
 function CreateScreen({
   actorId,
   dataSource,
+  deployment,
+  markets,
+  onOpenMarket,
   onMarketCreated,
 }: {
   actorId: string;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  deployment: AppDeployment | null;
+  markets: MarketReadModel[];
+  onOpenMarket: (marketId: string) => void;
   onMarketCreated: (market: DeployedMarket) => void;
 }) {
-  const [form, setForm] = useState<CreateDraftInput>({
-    question: "",
-    closeTime: toDateTimeLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-    resolutionSource: "",
-    invalidConditions: "",
-    creationBond: "100",
-    initialLiquidity: "1000",
-  });
+  const [chainClockMs, setChainClockMs] = useState<number | null>(null);
+  const [form, setForm] = useState<CreateDraftInput>(() => createEmptyDraftInput(deployment));
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [candidates, setCandidates] = useState<MarketImportCandidate[]>([]);
+  const [candidatePage, setCandidatePage] = useState(0);
+  const [selectedCandidate, setSelectedCandidate] = useState<MarketImportCandidate | null>(null);
+  const [browseStatus, setBrowseStatus] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<MarketDraftResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<string | null>(null);
+  const readyPanelRef = useRef<HTMLDivElement | null>(null);
+  const selectedTagLabel = curatedMarketTags.find((tag) => tag.slug === selectedTag)?.label ?? "Market ideas";
+  const existingMarketsByIdeaKey = useMemo(() => {
+    const byKey = new Map<string, MarketReadModel>();
+    markets.forEach((market) => {
+      const key = sourceIdeaKeyFromMarket(market);
+      if (key && !byKey.has(key)) {
+        byKey.set(key, market);
+      }
+    });
+
+    return byKey;
+  }, [markets]);
+  const selectedExistingMarket = selectedCandidate
+    ? existingMarketsByIdeaKey.get(sourceIdeaKeyFromCandidate(selectedCandidate) ?? "")
+    : undefined;
+  const discoverPill = browseStatus?.startsWith("Looking")
+    ? "Searching"
+    : search.trim()
+      ? `${candidates.length} results`
+      : selectedTag
+        ? selectedTagLabel
+        : "Trending now";
+  const visibleBrowseStatus = browseStatus === "No matching market ideas found."
+    ? "Nothing ready here yet. Try another tag or search."
+    : browseStatus;
+  const visibleMarketSuggestions = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const candidateSuggestions = candidates.slice(0, CREATE_IDEA_PAGE_SIZE).map((candidate) => ({
+      key: `candidate-${candidate.id}`,
+      label: shortMarketTitle(candidate.question),
+      query: candidate.question,
+      candidate,
+    }));
+    const seedSuggestions = marketIdeaSuggestions.map((suggestion) => ({
+      key: `seed-${suggestion.query}`,
+      label: suggestion.label,
+      query: suggestion.query,
+    }));
+    const seen = new Set<string>();
+
+    return [...candidateSuggestions, ...seedSuggestions]
+      .filter((suggestion) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+
+        return `${suggestion.label} ${suggestion.query}`.toLowerCase().includes(normalizedSearch);
+      })
+      .filter((suggestion) => {
+        const key = suggestion.query.toLowerCase();
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      })
+      .slice(0, CREATE_IDEA_PAGE_SIZE);
+  }, [candidates, search]);
+  const candidatePageCount = Math.max(1, Math.ceil(candidates.length / CREATE_IDEA_PAGE_SIZE));
+  const visibleCandidatePage = Math.min(candidatePage, candidatePageCount - 1);
+  const pagedCandidates = candidates.slice(
+    visibleCandidatePage * CREATE_IDEA_PAGE_SIZE,
+    visibleCandidatePage * CREATE_IDEA_PAGE_SIZE + CREATE_IDEA_PAGE_SIZE,
+  );
 
   const updateField = (field: keyof CreateDraftInput, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1180,22 +1588,174 @@ function CreateScreen({
     setTxStatus(null);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    setCandidatePage(0);
+    setBrowseStatus("Looking for market ideas...");
+    fetchImportCandidates(selectedTag, search)
+      .then((nextCandidates) => {
+        if (cancelled) {
+          return;
+        }
+        setCandidates(nextCandidates);
+        setBrowseStatus(nextCandidates.length ? null : "No matching market ideas found.");
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setCandidates([]);
+          setBrowseStatus(caught instanceof Error ? caught.message : "Market ideas unavailable");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [search, selectedTag]);
+
+  useEffect(() => {
+    if (!deployment) {
+      setChainClockMs(null);
+      return;
+    }
+
+    let cancelled = false;
+    readDeploymentBlockClockMs(deployment)
+      .then((nextClockMs) => {
+        if (!cancelled) {
+          setChainClockMs(nextClockMs);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setChainClockMs(deployment.generatedAtBlockTimestamp * 1000);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deployment]);
+
+  useEffect(() => {
+    if (!draftPreview) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      readyPanelRef.current?.scrollIntoView({ block: "center" });
+    });
+  }, [draftPreview]);
+
+  useEffect(() => {
+    if (!selectedCandidate && !form.question) {
+      setForm(createEmptyDraftInput(deployment, chainClockMs));
+    }
+  }, [chainClockMs, deployment, form.question, selectedCandidate]);
+
+  useEffect(() => {
+    if (!selectedCandidate) {
+      return;
+    }
+
+    const normalizedCloseTime = normalizeCreateCloseTime(selectedCandidate.closeTime, deployment, chainClockMs);
+    setForm((current) =>
+      current.closeTime === normalizedCloseTime ? current : { ...current, closeTime: normalizedCloseTime },
+    );
+    setDraftPreview(null);
+    setTxStatus(null);
+  }, [chainClockMs, deployment, selectedCandidate]);
+
+  const selectCandidate = (candidate: MarketImportCandidate) => {
+    setSelectedCandidate(candidate);
+    setForm((current) => ({
+      ...current,
+      question: candidate.question,
+      closeTime: normalizeCreateCloseTime(candidate.closeTime, deployment, chainClockMs),
+      resolutionSource: candidate.resolutionSource,
+      invalidConditions: candidate.invalidConditions.join("\n"),
+      imageUrl: candidate.imageUrl,
+      sourceIdea: sourceIdeaFromCandidate(candidate),
+    }));
+    setDraftPreview(null);
+    setError(null);
+    setTxStatus(null);
+  };
+
+  const clearSelectedMarket = () => {
+    setSelectedCandidate(null);
+    setForm(createEmptyDraftInput(deployment, chainClockMs));
+    setDraftPreview(null);
+    setError(null);
+    setTxStatus(null);
+  };
+
+  const applyMarketSuggestion = (suggestion: (typeof visibleMarketSuggestions)[number]) => {
+    setSearch(suggestion.query);
+    setSelectedTag(null);
+    if ("candidate" in suggestion && suggestion.candidate) {
+      selectCandidate(suggestion.candidate);
+      return;
+    }
+
+    clearSelectedMarket();
+  };
+
+  const selectBestVisibleIdea = (query: string) => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const matchingCandidate = normalizedQuery
+      ? candidates.find((candidate) =>
+          `${candidate.question} ${candidate.description} ${candidate.tagLabel}`.toLowerCase().includes(normalizedQuery),
+        )
+      : candidates[0];
+
+    if (matchingCandidate) {
+      selectCandidate(matchingCandidate);
+      return;
+    }
+
+    const matchingSuggestion = normalizedQuery
+      ? visibleMarketSuggestions.find((suggestion) =>
+          `${suggestion.label} ${suggestion.query}`.toLowerCase().includes(normalizedQuery),
+        )
+      : visibleMarketSuggestions[0];
+
+    if (matchingSuggestion) {
+      applyMarketSuggestion(matchingSuggestion);
+    }
+  };
+
   const createLocalMarket = async () => {
     if (!draftPreview) {
       return;
     }
-    setTxStatus("Create market pending...");
+    if (selectedExistingMarket) {
+      onOpenMarket(selectedExistingMarket.id);
+      return;
+    }
+    setTxStatus("Creating your market...");
     try {
-      const result = await dataSource.executeCreateMarket(actorId, draftPreview);
-      setTxStatus(`Create market confirmed: ${shortAddress(result.hash)}`);
+      const result = await dataSource.executeCreateMarket(actorId, draftPreview, {
+        imageUrl: form.imageUrl,
+        sourceIdea: form.sourceIdea,
+      });
+      setTxStatus(`Market created. Receipt ${shortAddress(result.hash)}`);
       onMarketCreated(result.market);
     } catch (caught) {
-      setTxStatus(caught instanceof Error ? caught.message : "Create market failed");
+      setTxStatus(caught instanceof Error ? caught.message : "Could not create this market");
     }
   };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!selectedCandidate) {
+      setError("Select a market idea first.");
+      return;
+    }
+    if (selectedExistingMarket) {
+      onOpenMarket(selectedExistingMarket.id);
+      return;
+    }
     try {
       setDraftPreview(await dataSource.buildDraftPreview(form));
       setError(null);
@@ -1207,73 +1767,253 @@ function CreateScreen({
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Create</p>
-          <h1>New market draft</h1>
-        </div>
-      </header>
+      <section className="create-experience">
+        <section className="create-main-grid">
+          <section className="create-panel market-browser" aria-label="Browse market ideas">
+            <div className="create-section-head create-idea-head">
+              <div>
+                <h1>I know what people should bet on</h1>
+                <span>Search what you already know, or start with a suggestion while the idea is still forming.</span>
+              </div>
+              <span className="create-count">{discoverPill}</span>
+            </div>
 
-      <section className="create-layout">
-        <form className="form-panel" onSubmit={onSubmit}>
-          <label>
-            Question
-            <input
-              value={form.question}
-              onChange={(event) => updateField("question", event.target.value)}
-              placeholder="Will..."
-            />
-          </label>
-          <label>
-            Close time
-            <input
-              type="datetime-local"
-              value={form.closeTime}
-              onChange={(event) => updateField("closeTime", event.target.value)}
-            />
-          </label>
-          <label>
-            Resolution source
-            <input
-              value={form.resolutionSource}
-              onChange={(event) => updateField("resolutionSource", event.target.value)}
-              placeholder="Source of truth"
-            />
-          </label>
-          <label>
-            Invalid conditions
-            <textarea
-              value={form.invalidConditions}
-              onChange={(event) => updateField("invalidConditions", event.target.value)}
-              rows={4}
-            />
-          </label>
-          <div className="two-column">
-            <label>
-              Creation bond
+            <label className="create-search-field">
+              Market idea
               <input
-                inputMode="decimal"
-                value={form.creationBond}
-                onChange={(event) => updateField("creationBond", event.target.value)}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    selectBestVisibleIdea(event.currentTarget.value);
+                  }
+                }}
+                placeholder="Create a market on..."
               />
             </label>
-            <label>
-              Initial liquidity
-              <input
-                inputMode="decimal"
-                value={form.initialLiquidity}
-                onChange={(event) => updateField("initialLiquidity", event.target.value)}
-              />
-            </label>
-          </div>
-          {error && <p className="error-text">{error}</p>}
-          <button type="submit">Build draft</button>
-        </form>
 
-        <DraftPreview preview={draftPreview} onCreate={createLocalMarket} txStatus={txStatus} />
+            <div className="create-suggestion-block" aria-label="Market idea suggestions">
+              <div className="create-suggestion-head">
+                <strong>{search.trim() ? "Maybe this?" : "Think about"}</strong>
+                <span>{search.trim() ? "Matching starts" : "A few starts if your brain is loading"}</span>
+              </div>
+              <div className="create-suggestion-list">
+                {visibleMarketSuggestions.map((suggestion) => (
+                  <button key={suggestion.key} type="button" onClick={() => applyMarketSuggestion(suggestion)}>
+                    <span>{suggestion.label}</span>
+                    <span>+</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="create-tag-list" aria-label="Browse by topic">
+              {curatedMarketTags.map((tag) => (
+                <button
+                  key={tag.slug}
+                  className={tag.slug === selectedTag ? "create-tag-chip active" : "create-tag-chip"}
+                  type="button"
+                  onClick={() => setSelectedTag((current) => (current === tag.slug ? null : tag.slug))}
+                >
+                  {tag.label}
+                </button>
+              ))}
+              {selectedTag && (
+                <button className="create-tag-chip clear" type="button" onClick={() => setSelectedTag(null)}>
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            {visibleBrowseStatus && (
+              <p className={visibleBrowseStatus.startsWith("Looking") ? "create-note" : "create-empty-note"}>
+                {visibleBrowseStatus}
+              </p>
+            )}
+
+            <div className="market-result-list">
+              {pagedCandidates.map((candidate) => {
+                const existingMarket = existingMarketsByIdeaKey.get(sourceIdeaKeyFromCandidate(candidate) ?? "");
+                const isSelected = selectedCandidate?.id === candidate.id;
+
+                return (
+                  <button
+                    key={candidate.id}
+                    className={isSelected ? "market-result selected" : "market-result"}
+                    type="button"
+                    onClick={() => (existingMarket ? onOpenMarket(existingMarket.id) : selectCandidate(candidate))}
+                  >
+                    <div>
+                      <h3>{candidate.question}</h3>
+                    </div>
+                    <div className="market-meta-row">
+                      <span>{existingMarket ? "Already on iknow" : isSelected ? "Selected market" : "Rules ready"}</span>
+                      <span>{candidate.tagLabel || selectedTagLabel}</span>
+                      <span>{formatDate(candidate.closeTime)}</span>
+                    </div>
+                    <span className={isSelected ? "create-result-action active" : "create-result-action"}>
+                      {existingMarket ? "Open market" : isSelected ? "Selected" : "Use this"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {candidates.length > CREATE_IDEA_PAGE_SIZE && (
+              <div className="market-result-pagination" aria-label="Market idea pages">
+                <button
+                  className="secondary"
+                  type="button"
+                  disabled={visibleCandidatePage === 0}
+                  onClick={() => setCandidatePage(Math.max(0, visibleCandidatePage - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  {visibleCandidatePage + 1} / {candidatePageCount}
+                </span>
+                <button
+                  className="secondary"
+                  type="button"
+                  disabled={visibleCandidatePage >= candidatePageCount - 1}
+                  onClick={() => setCandidatePage(Math.min(candidatePageCount - 1, visibleCandidatePage + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </section>
+
+          <aside className="create-draft-card">
+            {selectedCandidate ? (
+              <>
+                <form className="create-draft-body" onSubmit={onSubmit}>
+                  <div className="create-draft-question">
+                    <span>I know what you meant</span>
+                    <h3>{form.question}</h3>
+                  </div>
+
+                  <div className="create-outcome-grid" aria-label="Outcomes">
+                    <div>
+                      <strong>Yes</strong>
+                      <p>The event in the question happens before the close time.</p>
+                    </div>
+                    <div>
+                      <strong>No</strong>
+                      <p>The event does not happen, or the result clearly says otherwise.</p>
+                    </div>
+                  </div>
+
+                  <div className="create-draft-sections">
+                    <div className="create-field">
+                      <label>Rules</label>
+                      <p>{selectedCandidate.description}</p>
+                    </div>
+                    <label className="create-field">
+                      Where to check the result
+                      <textarea
+                        disabled
+                        readOnly
+                        value={form.resolutionSource}
+                        rows={3}
+                      />
+                    </label>
+                    <label className="create-field">
+                      Invalid conditions
+                      <textarea
+                        disabled
+                        readOnly
+                        value={form.invalidConditions}
+                        rows={4}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="create-field-split">
+                    <label>
+                      Money to start the market
+                      <input
+                        inputMode="decimal"
+                        type="number"
+                        min={CREATE_MIN_INITIAL_LIQUIDITY_USDC}
+                        step="0.000001"
+                        value={form.initialLiquidity}
+                        onChange={(event) => updateField("initialLiquidity", event.target.value)}
+                      />
+                      <span>Minimum {CREATE_MIN_INITIAL_LIQUIDITY_USDC} USDC. The first money available when people join or trade.</span>
+                    </label>
+                    <label>
+                      Safety deposit
+                      <input
+                        inputMode="decimal"
+                        type="number"
+                        min={CREATE_MIN_CREATION_BOND_USDC}
+                        step="0.000001"
+                        value={form.creationBond}
+                        onChange={(event) => updateField("creationBond", event.target.value)}
+                      />
+                      <span>Minimum {CREATE_MIN_CREATION_BOND_USDC} USDC. You get it back when the result is clear.</span>
+                    </label>
+                  </div>
+
+                  <div className="create-field">
+                    <label>Close time</label>
+                    <p>{formatDate(new Date(form.closeTime).toISOString())}</p>
+                  </div>
+
+                  <div className="receipt-note">
+                    When the market ends, iknow agents check these details and mark it Yes, No, or Invalid.
+                  </div>
+
+                  {error && <p className="create-error">{error}</p>}
+
+                  {draftPreview ? (
+                    <div ref={readyPanelRef}>
+                      <DraftPreview preview={draftPreview} onCreate={createLocalMarket} txStatus={txStatus} />
+                    </div>
+                  ) : (
+                    <button className="create-primary" type="submit">
+                      Review details
+                    </button>
+                  )}
+                </form>
+              </>
+            ) : (
+              <div className="create-empty-canvas">
+                <span>No market selected</span>
+                <h2>Pick an idea and I’ll shape it into a market.</h2>
+                <p>
+                  Suggestions and search live on the left. Once you choose one, this side becomes the market draft with
+                  outcomes, rules, result source, and funding.
+                </p>
+              </div>
+            )}
+          </aside>
+        </section>
       </section>
     </>
   );
+}
+
+function MugMascot() {
+  return (
+    <div className="create-mascot" aria-hidden="true">
+      <span className="create-mascot-handle" />
+      <span className="create-mascot-smirk" />
+    </div>
+  );
+}
+
+function shortMarketTitle(question: string) {
+  const title = question.replace(/\?$/, "");
+  if (title.length <= 58) {
+    return title;
+  }
+
+  const clipped = title.slice(0, 58);
+  const lastSpace = clipped.lastIndexOf(" ");
+  return `${clipped.slice(0, lastSpace > 38 ? lastSpace : 58)}...`;
 }
 
 function DraftPreview({
@@ -1285,47 +2025,55 @@ function DraftPreview({
   onCreate: () => void;
   txStatus: string | null;
 }) {
-  if (!preview) {
-    return (
-      <aside className="preview-panel empty">
-        <h2>Draft preview</h2>
-        <p>No draft built.</p>
-      </aside>
-    );
+  if (!preview && !txStatus) {
+    return null;
   }
 
+  const isErrorStatus = Boolean(
+    txStatus &&
+      ["failed", "not loaded", "could not", "revert", "insufficient", "must"].some((token) =>
+        txStatus.toLowerCase().includes(token),
+      ),
+  );
+
   return (
-    <aside className="preview-panel">
-      <h2>Draft preview</h2>
-      <dl className="compact-list">
-        <div>
-          <dt>Question</dt>
-          <dd>{preview.draft.question}</dd>
-        </div>
-        <div>
-          <dt>Spec hash</dt>
-          <dd>{shortAddress(preview.factoryArgs.specHash)}</dd>
-        </div>
-        <div>
-          <dt>Metadata URI</dt>
-          <dd>{preview.factoryArgs.metadataURI}</dd>
-        </div>
-        <div>
-          <dt>Close time</dt>
-          <dd>{preview.factoryArgs.closeTime}</dd>
-        </div>
-        <div>
-          <dt>Creation bond units</dt>
-          <dd>{preview.factoryArgs.creationBond}</dd>
-        </div>
-        <div>
-          <dt>Initial liquidity units</dt>
-          <dd>{preview.factoryArgs.initialLiquidity}</dd>
-        </div>
-      </dl>
-      <button onClick={onCreate}>Create local market</button>
-      {txStatus && <p className={txStatus.includes("failed") || txStatus.includes("not loaded") ? "error-text" : "status-text"}>{txStatus}</p>}
-    </aside>
+    <div className="create-ready-panel">
+      {preview && (
+        <>
+          <div>
+            <span>Ready to start</span>
+            <h3>Ready to create</h3>
+            <p>
+              You provide {formatUsdcUnits(preview.factoryArgs.initialLiquidity)} to start and keep a{" "}
+              {formatUsdcUnits(preview.factoryArgs.creationBond)} safety deposit.
+            </p>
+          </div>
+
+          <button className="create-primary" type="button" onClick={onCreate}>
+            Create market on iknow
+          </button>
+
+          <details className="create-technical-details">
+            <summary>Create details</summary>
+            <dl className="compact-list">
+              <div>
+                <dt>Spec hash</dt>
+                <dd>{shortAddress(preview.factoryArgs.specHash)}</dd>
+              </div>
+              <div>
+                <dt>Metadata URI</dt>
+                <dd>{preview.factoryArgs.metadataURI}</dd>
+              </div>
+              <div>
+                <dt>Close time</dt>
+                <dd>{formatDate(new Date(preview.factoryArgs.closeTime * 1000).toISOString())}</dd>
+              </div>
+            </dl>
+          </details>
+        </>
+      )}
+      {txStatus && <p className={isErrorStatus ? "create-error" : "create-success"}>{txStatus}</p>}
+    </div>
   );
 }
 
@@ -1382,8 +2130,8 @@ function PortfolioScreen({
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Portfolio</p>
-          <h1>{portfolio.actor.name}</h1>
+          <p className="eyebrow">Profile</p>
+          <h1>Your iknow</h1>
         </div>
         <span className="count-pill">{shortAddress(portfolio.actor.address)}</span>
       </header>

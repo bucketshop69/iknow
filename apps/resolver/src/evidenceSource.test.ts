@@ -38,6 +38,19 @@ test("builds deterministic draw evidence", () => {
   assert.equal(packet?.extractedFacts[0]?.claim, "Liverpool 1-1 Manchester City on 2026-05-11T19:00:00.000Z.");
 });
 
+test("builds deterministic Arc smoke evidence with local invalid check", () => {
+  const market = marketFixture({
+    id: "arc-smoke-test",
+    question: "Will this Arc testnet smoke market resolve YES?",
+    invalidConditions: ["Resolve INVALID only if the test market was created with malformed metadata."],
+  });
+  const packet = buildEvidencePacket(market, snapshotFixture(market), "test-agent", "2026-05-16T00:00:00.000Z");
+
+  assert.equal(packet?.suggestedOutcome, "YES");
+  assert.equal(packet?.confidence, 0.99);
+  assert.equal(packet?.invalidChecks[0]?.status, "PASSED");
+});
+
 test("refuses packets when invalid checks cannot be verified", () => {
   const market = marketFixture({
     id: "epl-invalid-condition",

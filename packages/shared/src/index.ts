@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const CREATE_MIN_CREATION_BOND_USDC = "5";
+export const CREATE_MIN_INITIAL_LIQUIDITY_USDC = "10";
+
 export const evmAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
 
 export const arcTestnet = {
@@ -121,6 +124,15 @@ export const localActorSchema = z.object({
   privateKey: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
 });
 
+export const marketSourceIdeaSchema = z.object({
+  provider: z.string().min(1),
+  externalId: z.string().min(1),
+  url: z.string().url().optional(),
+  imageUrl: z.string().url().optional(),
+  question: z.string().min(8).optional(),
+  closeTime: z.string().datetime().optional(),
+});
+
 export const deployedMarketSchema = z.object({
   id: z.string().min(1),
   address: evmAddressSchema,
@@ -130,6 +142,8 @@ export const deployedMarketSchema = z.object({
   closeTime: z.number().int().positive(),
   resolutionSource: z.string().min(1).optional(),
   invalidConditions: z.array(z.string().min(1)).optional(),
+  imageUrl: z.string().url().optional(),
+  sourceIdea: marketSourceIdeaSchema.optional(),
   creationBond: z.string().regex(/^\d+$/),
   initialLiquidity: z.string().regex(/^\d+$/),
   yesTokenId: z.string().regex(/^\d+$/),
@@ -179,6 +193,7 @@ export type EvidencePacket = z.infer<typeof evidencePacketSchema>;
 export type EvidencePacketResponse = z.infer<typeof evidencePacketResponseSchema>;
 export type MarketFactoryArgs = z.infer<typeof marketFactoryArgsSchema>;
 export type MarketDraftResponse = z.infer<typeof marketDraftResponseSchema>;
+export type MarketSourceIdea = z.infer<typeof marketSourceIdeaSchema>;
 export type LocalActor = z.infer<typeof localActorSchema>;
 export type DeployedMarket = z.infer<typeof deployedMarketSchema>;
 export type LocalDeployment = z.infer<typeof localDeploymentSchema>;

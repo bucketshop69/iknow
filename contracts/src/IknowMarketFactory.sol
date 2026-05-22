@@ -25,29 +25,38 @@ contract IknowMarketFactory {
     error InvalidCloseTime();
     error InvalidAddress();
 
-    uint256 public constant DEFAULT_TOTAL_FEE_BPS = 30;
+    uint256 private constant DEFAULT_TOTAL_FEE_BPS = 30;
+    uint256 private constant MIN_CREATION_BOND = 5 * 1e6;
+    uint256 private constant MIN_INITIAL_LIQUIDITY = 10 * 1e6;
 
     IERC20 public immutable usdc;
     OutcomeToken public immutable outcomeToken;
     address public resolver;
     address public protocolFeeRecipient;
-    uint256 public defaultChallengeWindow = 1 hours;
-    uint256 public defaultFeeBps = DEFAULT_TOTAL_FEE_BPS;
+    uint256 private immutable defaultChallengeWindow;
 
     address[] public allMarkets;
     mapping(address => bool) public isMarket;
 
-    constructor(IERC20 usdc_, OutcomeToken outcomeToken_, address resolver_, address protocolFeeRecipient_) {
+    constructor(
+        IERC20 usdc_,
+        OutcomeToken outcomeToken_,
+        address resolver_,
+        address protocolFeeRecipient_,
+        uint256 defaultChallengeWindow_
+    ) {
         if (
             address(usdc_) == address(0) || address(outcomeToken_) == address(0) || resolver_ == address(0)
                 || protocolFeeRecipient_ == address(0)
         ) {
             revert InvalidAddress();
         }
+        if (defaultChallengeWindow_ == 0) revert InvalidAmount();
         usdc = usdc_;
         outcomeToken = outcomeToken_;
         resolver = resolver_;
         protocolFeeRecipient = protocolFeeRecipient_;
+        defaultChallengeWindow = defaultChallengeWindow_;
     }
 
     function marketCount() external view returns (uint256) {
@@ -62,7 +71,7 @@ contract IknowMarketFactory {
         uint256 initialLiquidity
     ) external returns (address marketAddr) {
         if (closeTime <= block.timestamp) revert InvalidCloseTime();
-        if (initialLiquidity == 0) revert InvalidAmount();
+        if (creationBond < MIN_CREATION_BOND || initialLiquidity < MIN_INITIAL_LIQUIDITY) revert InvalidAmount();
 
         IknowMarket market = new IknowMarket(
             usdc,
@@ -75,7 +84,7 @@ contract IknowMarketFactory {
             metadataURI,
             closeTime,
             defaultChallengeWindow,
-            defaultFeeBps
+            DEFAULT_TOTAL_FEE_BPS
         );
         marketAddr = address(market);
         isMarket[marketAddr] = true;
