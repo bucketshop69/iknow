@@ -1,5 +1,6 @@
+import { marketImportReviewResponseSchema } from "@iknow/shared";
 import { apiBaseUrl } from "./data";
-import type { MarketImportCandidate, MarketImportTag } from "./types";
+import type { CreateDraftInput, MarketImportCandidate, MarketImportReviewResult, MarketImportTag } from "./types";
 
 export const curatedMarketTags: MarketImportTag[] = [
   { slug: "politics", label: "Politics", id: 2 },
@@ -152,4 +153,35 @@ export async function fetchImportCandidates(tagSlug: string | null, query: strin
 
     return matchesTag && matchesQuery;
   });
+}
+
+export async function reviewImportCandidate(
+  candidate: MarketImportCandidate,
+  input: CreateDraftInput,
+): Promise<MarketImportReviewResult> {
+  const invalidConditions = input.invalidConditions
+    .split("\n")
+    .map((condition) => condition.trim())
+    .filter(Boolean);
+
+  const response = await fetch(`${apiBaseUrl}/market-import/review`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      candidate,
+      editedDraft: {
+        question: input.question.trim(),
+        closeTime: new Date(input.closeTime).toISOString(),
+        resolutionSource: input.resolutionSource.trim(),
+        invalidConditions,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(payload.message ?? "Market review failed");
+  }
+
+  return marketImportReviewResponseSchema.parse(await response.json());
 }

@@ -382,6 +382,7 @@ export function marketsFromDeployment(deployment: AppDeployment | null): MarketR
     specHash: market.specHash as `0x${string}`,
     imageUrl: market.imageUrl,
     sourceIdea: market.sourceIdea,
+    importReview: market.importReview,
     creator: "Creator",
     yesPrice: index === 0 ? 0.5 : 0.5,
     noPrice: index === 0 ? 0.5 : 0.5,
@@ -455,6 +456,7 @@ export interface MarketCreationResult {
 export interface CreateMarketSourceMetadata {
   imageUrl?: string;
   sourceIdea?: MarketSourceIdeaReadModel;
+  importReview?: DeployedMarket["importReview"];
 }
 
 export type TradeAction = "BUY_YES" | "BUY_NO" | "SELL_YES" | "SELL_NO";
@@ -1336,21 +1338,29 @@ async function executeCreateMarket(
   const factory = deployment.contracts.iknowMarketFactory.address;
   const { walletClient, account } = connectedWriter(deployment, actorId, wallet);
   const totalUsdc = BigInt(draft.factoryArgs.creationBond) + BigInt(draft.factoryArgs.initialLiquidity);
+  const createMarketArgs = [
+    draft.factoryArgs.specHash as Hex,
+    draft.factoryArgs.metadataURI,
+    BigInt(draft.factoryArgs.closeTime),
+    BigInt(draft.factoryArgs.creationBond),
+    BigInt(draft.factoryArgs.initialLiquidity),
+  ] as const;
 
   await approveUsdc(deployment, actorId, factory, totalUsdc, wallet);
+  const gas = await estimateCreateMarketGas(
+    deployment,
+    typeof account === "string" ? account : account.address,
+    factory,
+    createMarketArgs,
+  );
 
   const hash = await writeContractUnchecked(walletClient, {
     account,
     address: factory,
     abi: iknowMarketFactoryAbi,
     functionName: "createMarket",
-    args: [
-      draft.factoryArgs.specHash as Hex,
-      draft.factoryArgs.metadataURI,
-      BigInt(draft.factoryArgs.closeTime),
-      BigInt(draft.factoryArgs.creationBond),
-      BigInt(draft.factoryArgs.initialLiquidity),
-    ],
+    args: createMarketArgs,
+    ...(gas ? { gas } : {}),
   });
   const receipt = await waitForSuccess(deployment, hash);
   const logs = parseEventLogs({
@@ -1374,6 +1384,7 @@ async function executeCreateMarket(
     invalidConditions: draft.draft.invalidConditions,
     imageUrl: sourceMetadata.imageUrl,
     sourceIdea: sourceMetadata.sourceIdea,
+    importReview: sourceMetadata.importReview,
     creationBond: draft.factoryArgs.creationBond,
     initialLiquidity: draft.factoryArgs.initialLiquidity,
     yesTokenId: BigInt(keccak256(encodePacked(["address", "uint8"], [marketAddress, 0]))).toString(),
@@ -1386,6 +1397,27 @@ async function executeCreateMarket(
     hash,
     market,
   };
+}
+
+async function estimateCreateMarketGas(
+  deployment: AppDeployment,
+  account: Address,
+  factory: Address,
+  args: readonly [Hex, string, bigint, bigint, bigint],
+) {
+  try {
+    const estimate = await publicClientFor(deployment).estimateContractGas({
+      account,
+      address: factory,
+      abi: iknowMarketFactoryAbi,
+      functionName: "createMarket",
+      args,
+    });
+
+    return (estimate * 13n) / 10n;
+  } catch {
+    return undefined;
+  }
 }
 
 async function persistCreatedMarket(deployment: AppDeployment, market: DeployedMarket) {

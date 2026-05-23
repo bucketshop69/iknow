@@ -27,6 +27,169 @@
   },
   "markets": [
     {
+      "id": "will-uzbekistan-win-the-2026-fifa-world-cup-b7e392",
+      "address": "0x8e3b8a00d68e6ddaE363B75309861af76B168293",
+      "specHash": "0x4da37c2c13a9cc59a98adc2555fe09f02bc1bc5a6ddb59507fe6955759bb7c36",
+      "metadataURI": "urn:iknow:market:0x4da37c2c13a9cc59a98adc2555fe09f02bc1bc5a6ddb59507fe6955759bb7c36",
+      "question": "Will Uzbekistan win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official announcement from FIFA (fifa.com) confirming the winner of the 2026 FIFA World Cup. If FIFA announcement is unavailable, a consensus of major sports news outlets (ESPN, BBC Sport, The Guardian) reporting the same winner is acceptable. YES path: The market resolves YES if Uzbekistan is declared the winner of the 2026 FIFA World Cup by FIFA official announcement. The resolver verifies this through FIFA's official website, press releases, or credible sports reporting consensus. NO path: The market resolves NO if any other team wins the 2026 FIFA World Cup, or if Uzbekistan is eliminated at any point during qualification or the tournament, or if Uzbekistan fails to qualify for the 2026 World Cup. Evidence plan: FIFA official announcement of 2026 World Cup winner FIFA World Cup 2026 official results page Major sports news outlets (ESPN, BBC Sport) World Cup coverage Official FIFA social media channels for tournament results",
+      "invalidConditions": [
+        "The result cannot be objectively checked from the market details.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026, 11:59 PM this market will resolve to “Other”.",
+        "If the 2026 FIFA World Cup is permanently canceled before completion, resolve to 'Other'.",
+        "If the 2026 FIFA World Cup has not been completed by October 13, 2026, 11:59 PM UTC, resolve to 'Other'.",
+        "If Uzbekistan fails to qualify for the 2026 FIFA World Cup, resolve to 'No' immediately upon qualification results.",
+        "If the result cannot be verified from FIFA official sources or credible sports reporting",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 11:59 PM UTC, resolve to 'Other'",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 11:59 PM, resolve to 'Other'"
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-uzbekistan-win-the-2026-fifa-world-cup-773-YUDww6rLHD3U.jpg",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558960",
+        "url": "https://polymarket.com/market/will-uzbekistan-win-the-2026-fifa-world-cup-773",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-uzbekistan-win-the-2026-fifa-world-cup-773-YUDww6rLHD3U.jpg",
+        "question": "Will Uzbekistan win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "importReview": {
+        "status": "ready",
+        "resolverMode": "autonomous",
+        "resolverTemplate": "general-agent",
+        "score": 8.4,
+        "blockers": [],
+        "warnings": [
+          "Market is about a future sporting event with clear resolution criteria",
+          "FIFA as primary resolution source is highly reliable and objective",
+          "Close time (July 20, 2026) aligns with World Cup final (July 19, 2026)",
+          "Edge cases (cancellation, non-completion) are handled",
+          "One invalid condition is vague ('cannot be objectively checked')",
+          "Uzbekistan qualification status needs verification at resolution time",
+          "Close time of July 20, 2026 falls during typical World Cup window - market remains open during tournament",
+          "Uzbekistan qualification for 2026 tournament must be confirmed first (qualification occurs 2025)",
+          "Tournament schedule could extend past close time if matches are delayed",
+          "Ambiguity in 'permanently canceled' definition if temporary postponement occurs",
+          "Agent must track tournament progression to resolve NO immediately upon Uzbekistan elimination, not wait until final",
+          "Ambiguity around what constitutes 'permanently canceled' vs 'postponed' - clarify as 'not completed by deadline'",
+          "Need to confirm specific date for tournament completion if delayed but resuming",
+          "Tournament could be canceled or postponed, triggering 'Other' resolution",
+          "Unlikely but possible: Uzbekistan disqualified after advancing",
+          "Timezone ambiguity in close time vs actual tournament conclusion",
+          "Uzbekistan may not qualify for the 2026 World Cup (qualifiers ongoing until late 2025)",
+          "Ambiguous invalid condition could lead to disputes",
+          "Tournament scheduling changes could affect close time relevance",
+          "Political/interference scenarios not explicitly addressed",
+          "Minor ambiguity if Uzbekistan reaches the final but loses - but market wording 'wins' is clear",
+          "FIFA organizational structure changes could affect official announcements"
+        ],
+        "rewrittenResolutionSource": "Official announcement from FIFA (fifa.com) confirming the winner of the 2026 FIFA World Cup. If FIFA announcement is unavailable, a consensus of major sports news outlets (ESPN, BBC Sport, The Guardian) reporting the same winner is acceptable. YES path: The market resolves YES if Uzbekistan is declared the winner of the 2026 FIFA World Cup by FIFA official announcement. The resolver verifies this through FIFA's official website, press releases, or credible sports reporting consensus. NO path: The market resolves NO if any other team wins the 2026 FIFA World Cup, or if Uzbekistan is eliminated at any point during qualification or the tournament, or if Uzbekistan fails to qualify for the 2026 World Cup. Evidence plan: FIFA official announcement of 2026 World Cup winner FIFA World Cup 2026 official results page Major sports news outlets (ESPN, BBC Sport) World Cup coverage Official FIFA social media channels for tournament results",
+        "rewrittenInvalidConditions": [
+          "The result cannot be objectively checked from the market details.",
+          "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026, 11:59 PM this market will resolve to “Other”.",
+          "If the 2026 FIFA World Cup is permanently canceled before completion, resolve to 'Other'.",
+          "If the 2026 FIFA World Cup has not been completed by October 13, 2026, 11:59 PM UTC, resolve to 'Other'.",
+          "If Uzbekistan fails to qualify for the 2026 FIFA World Cup, resolve to 'No' immediately upon qualification results.",
+          "If the result cannot be verified from FIFA official sources or credible sports reporting",
+          "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 11:59 PM UTC, resolve to 'Other'",
+          "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 11:59 PM, resolve to 'Other'"
+        ],
+        "evidencePlan": [
+          "FIFA official announcement of 2026 World Cup winner",
+          "FIFA World Cup 2026 official results page",
+          "Major sports news outlets (ESPN, BBC Sport) World Cup coverage",
+          "Official FIFA social media channels for tournament results",
+          "Check FIFA official website (fifa.com) World Cup 2026 results section",
+          "Verify official FIFA tournament bracket and champion announcement",
+          "Monitor for Uzbekistan elimination in knockout stage for early NO resolution",
+          "Cross-reference with major sports outlets (ESPN, BBC Sport) for consensus"
+        ],
+        "requiredCapabilities": [
+          "Verify international sports tournament outcomes",
+          "Access and interpret FIFA official announcements",
+          "Cross-reference multiple sports news sources for consensus",
+          "sports-event-outcome-verification",
+          "fifa-world-cup-tracker",
+          "elimination-status-monitoring",
+          "access_world_wide_web",
+          "read_english",
+          "Verify international sporting event outcomes",
+          "Check FIFA official announcements",
+          "Understand knockout tournament elimination mechanics",
+          "Monitor World Cup qualification results",
+          "Read and interpret official FIFA announcements",
+          "Verify World Cup tournament outcomes from multiple credible sources"
+        ],
+        "missingCapabilities": [],
+        "reviewerReports": [
+          {
+            "role": "rule-parser",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Clear binary outcome with objective resolution criteria",
+              "Official resolution source (FIFA) provides unambiguous determination",
+              "Well-defined invalid condition for tournament cancellation/incompletion",
+              "Close time (July 20, 2026) allows resolution after tournament conclusion",
+              "Standard sports outcome verifiable through public records"
+            ]
+          },
+          {
+            "role": "evidence-source",
+            "score": 8,
+            "verdict": "pass",
+            "reasons": [
+              "Factual sporting outcome with clear objective resolution criteria",
+              "Official FIFA sources provide unambiguous winner determination",
+              "High market volume indicates real trading interest and community engagement",
+              "Early NO resolution on knockout elimination is well-specified"
+            ]
+          },
+          {
+            "role": "tooling",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Binary outcome with clear resolution criteria",
+              "Official FIFA results are public and authoritative",
+              "Close time aligns with post-tournament period",
+              "Invalid conditions are well-specified and reasonable"
+            ]
+          },
+          {
+            "role": "adversarial",
+            "score": 7,
+            "verdict": "warning",
+            "reasons": [
+              "Market is about a future sporting event with clear resolution criteria",
+              "FIFA as primary resolution source is highly reliable and objective",
+              "Close time (July 20, 2026) aligns with World Cup final (July 19, 2026)",
+              "Edge cases (cancellation, non-completion) are handled",
+              "One invalid condition is vague ('cannot be objectively checked')",
+              "Uzbekistan qualification status needs verification at resolution time"
+            ]
+          },
+          {
+            "role": "policy",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Standard sports outcome market with unambiguous resolution criteria",
+              "Clear resolution source: official FIFA information or credible reporting",
+              "Invalid conditions are well-defined for elimination and cancellation scenarios",
+              "Uzbekistan winning the 2026 World Cup is an objective factual outcome",
+              "Market has sufficient time window (close July 2026, resolution deadline October 2026)"
+            ]
+          }
+        ],
+        "reviewPolicyVersion": "market-import-review-llm-v1"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "113425003658105481741070185399289780591069813213327257418105969652175595592698",
+      "noTokenId": "27966352419467810202513549232030024854982611479623092617581480120465114012138"
+    },
+    {
       "id": "will-bitcoin-hit-150k-by-june-30-2026-577376",
       "address": "0xc6B75c6df25F59569b0935B4E7d577a9a17cA862",
       "specHash": "0xfec889b0f9f1148e07320072cf0988b8e5df620726774a838eb0d57f9ac7cead",

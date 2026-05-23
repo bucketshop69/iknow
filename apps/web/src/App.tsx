@@ -19,7 +19,7 @@ import {
   type TradeAction,
   type TradeQuoteReadback,
 } from "./data";
-import { curatedMarketTags, fetchImportCandidates, marketIdeaSuggestions } from "./importMarkets";
+import { curatedMarketTags, fetchImportCandidates, marketIdeaSuggestions, reviewImportCandidate } from "./importMarkets";
 import { iknowTheme } from "./tokens";
 import { arcTestnetChain } from "./wagmi";
 import type {
@@ -836,7 +836,7 @@ function MarketDetailScreen({
           <div className="market-detail-pills">
             <span className="status">{market.status}</span>
             <span className="status">Closes {formatDate(market.closeTime)}</span>
-            {market.sourceIdea?.provider && <span className="status">{market.sourceIdea.provider}</span>}
+            {market.sourceIdea?.provider && <span className="status">Source</span>}
           </div>
           <p className="eyebrow">Market detail</p>
           <h1>{market.question}</h1>
@@ -1943,6 +1943,7 @@ function CreateScreen({
   const [selectedCandidate, setSelectedCandidate] = useState<MarketImportCandidate | null>(null);
   const [browseStatus, setBrowseStatus] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<MarketDraftResponse | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<string | null>(null);
   const readyPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2013,8 +2014,9 @@ function CreateScreen({
   );
 
   const updateField = (field: keyof CreateDraftInput, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({ ...current, [field]: value, importReview: undefined }));
     setDraftPreview(null);
+    setReviewStatus(null);
     setError(null);
     setTxStatus(null);
   };
@@ -2094,6 +2096,7 @@ function CreateScreen({
       current.closeTime === normalizedCloseTime ? current : { ...current, closeTime: normalizedCloseTime },
     );
     setDraftPreview(null);
+    setReviewStatus(null);
     setTxStatus(null);
   }, [chainClockMs, deployment, selectedCandidate]);
 
@@ -2107,8 +2110,10 @@ function CreateScreen({
       invalidConditions: candidate.invalidConditions.join("\n"),
       imageUrl: candidate.imageUrl,
       sourceIdea: sourceIdeaFromCandidate(candidate),
+      importReview: undefined,
     }));
     setDraftPreview(null);
+    setReviewStatus(null);
     setError(null);
     setTxStatus(null);
   };
@@ -2117,6 +2122,7 @@ function CreateScreen({
     setSelectedCandidate(null);
     setForm(createEmptyDraftInput(deployment, chainClockMs));
     setDraftPreview(null);
+    setReviewStatus(null);
     setError(null);
     setTxStatus(null);
   };
@@ -2169,6 +2175,7 @@ function CreateScreen({
       const result = await dataSource.executeCreateMarket(actorId, draftPreview, {
         imageUrl: form.imageUrl,
         sourceIdea: form.sourceIdea,
+        importReview: form.importReview,
       });
       setTxStatus(`Market created. Receipt ${shortAddress(result.hash)}`);
       onMarketCreated(result.market);
@@ -2188,11 +2195,30 @@ function CreateScreen({
       return;
     }
     try {
-      setDraftPreview(await dataSource.buildDraftPreview(form));
+      setReviewStatus("Our agents are reviewing this market...");
+      const reviewResult = await reviewImportCandidate(selectedCandidate, form);
+      if (reviewResult.review.status !== "ready") {
+        setError("Agents need a clearer market before creation. Try another Source market.");
+        setDraftPreview(null);
+        setReviewStatus(null);
+        setForm((current) => ({ ...current, importReview: reviewResult.review }));
+        return;
+      }
+
+      const reviewedForm = {
+        ...form,
+        resolutionSource: reviewResult.draftPatch.resolutionSource,
+        invalidConditions: reviewResult.draftPatch.invalidConditions.join("\n"),
+        importReview: reviewResult.review,
+      };
+      setForm(reviewedForm);
+      setDraftPreview(await dataSource.buildDraftPreview(reviewedForm));
       setError(null);
+      setReviewStatus(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Draft validation failed");
       setDraftPreview(null);
+      setReviewStatus(null);
     }
   };
 
@@ -2279,7 +2305,7 @@ function CreateScreen({
                       <h3>{candidate.question}</h3>
                     </div>
                     <div className="market-meta-row">
-                      <span>{existingMarket ? "Already on iknow" : isSelected ? "Selected market" : "Rules ready"}</span>
+                      <span>{existingMarket ? "Already on iknow" : isSelected ? "Selected market" : "Ready to review"}</span>
                       <span>{candidate.tagLabel || selectedTagLabel}</span>
                       <span>{formatDate(candidate.closeTime)}</span>
                     </div>
@@ -2393,9 +2419,10 @@ function CreateScreen({
                     <p>{formatDate(new Date(form.closeTime).toISOString())}</p>
                   </div>
 
-                  <div className="receipt-note">
-                    When the market ends, iknow agents check these details and mark it Yes, No, or Invalid.
-                  </div>
+                  {reviewStatus && <p className="create-review-status">{reviewStatus}</p>}
+                  {!reviewStatus && draftPreview && form.importReview?.status === "ready" && (
+                    <p className="create-review-status ready">Agents approved this market.</p>
+                  )}
 
                   {error && <p className="create-error">{error}</p>}
 
@@ -2404,8 +2431,8 @@ function CreateScreen({
                       <DraftPreview preview={draftPreview} onCreate={createLocalMarket} txStatus={txStatus} />
                     </div>
                   ) : (
-                    <button className="create-primary" type="submit">
-                      Review details
+                    <button className="create-primary" type="submit" disabled={Boolean(reviewStatus)}>
+                      {reviewStatus ? "Agents are reviewing..." : "Review details"}
                     </button>
                   )}
                 </form>

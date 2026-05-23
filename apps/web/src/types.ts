@@ -1,3 +1,5 @@
+import type { ImportResolutionReview } from "@iknow/shared";
+
 export type Route =
   | { screen: "markets" }
   | { screen: "market"; marketId: string }
@@ -64,6 +66,7 @@ export interface MarketReadModel {
   volume24h: string;
   imageUrl?: string;
   sourceIdea?: MarketSourceIdeaReadModel;
+  importReview?: ImportResolutionReview;
 }
 
 export interface MarketUserState {
@@ -203,6 +206,7 @@ export interface CreateDraftInput {
   initialLiquidity: string;
   imageUrl?: string;
   sourceIdea?: MarketSourceIdeaReadModel;
+  importReview?: ImportResolutionReview;
 }
 
 export interface MarketSourceIdeaReadModel {
@@ -236,4 +240,12 @@ export interface MarketImportCandidate {
   liquidity?: string;
   volume?: string;
   volume24hr?: string;
+}
+
+export interface MarketImportReviewResult {
+  review: ImportResolutionReview;
+  draftPatch: {
+    resolutionSource: string;
+    invalidConditions: string[];
+  };
 }

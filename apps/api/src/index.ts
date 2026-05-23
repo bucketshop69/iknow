@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config as loadEnv } from "dotenv";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -12,7 +13,10 @@ import {
 } from "./deployment.js";
 import { createEvidencePacketResponse, prepareEvidencePacketResponse, readEvidencePacketResponse } from "./evidence.js";
 import { MARKET_IMPORT_TAGS, listMarketImportCandidates } from "./marketImport.js";
+import { logMarketImportReview, reviewMarketImportCandidate } from "./marketImportReview.js";
 import { createMarketDraftResponse } from "./marketDraft.js";
+
+loadEnv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.env") });
 
 export const app = new Hono();
 
@@ -57,6 +61,25 @@ app.get("/market-import/candidates", async (c) => {
         message: error instanceof Error ? error.message : "Unable to fetch market ideas",
       },
       502,
+    );
+  }
+});
+
+app.post("/market-import/review", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+
+  try {
+    const response = await reviewMarketImportCandidate(body);
+    logMarketImportReview(response.review);
+
+    return c.json(response);
+  } catch (error) {
+    return c.json(
+      {
+        error: "MARKET_IMPORT_REVIEW_FAILED",
+        message: error instanceof Error ? error.message : "Unable to review market import",
+      },
+      400,
     );
   }
 });

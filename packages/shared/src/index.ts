@@ -133,6 +133,51 @@ export const marketSourceIdeaSchema = z.object({
   closeTime: z.string().datetime().optional(),
 });
 
+export const importReviewStatusSchema = z.enum(["ready", "needs-review", "rejected"]);
+export const importResolverModeSchema = z.enum(["autonomous", "source-mirror", "needs-human-review"]);
+export const importResolverTemplateSchema = z.enum([
+  "general-agent",
+  "binance-candle",
+  "sports-final-score",
+  "official-confirmation",
+  "onchain-read",
+  "source-mirror",
+  "unsupported",
+]);
+export const importReviewerRoleSchema = z.enum(["rule-parser", "evidence-source", "tooling", "adversarial", "policy"]);
+export const importReviewerVerdictSchema = z.enum(["pass", "warning", "blocker"]);
+
+export const importResolutionReviewerSchema = z.object({
+  role: importReviewerRoleSchema,
+  score: z.number().min(1).max(10),
+  verdict: importReviewerVerdictSchema,
+  reasons: z.array(z.string().min(1)),
+});
+
+export const importResolutionReviewSchema = z.object({
+  status: importReviewStatusSchema,
+  resolverMode: importResolverModeSchema,
+  resolverTemplate: importResolverTemplateSchema,
+  score: z.number().min(1).max(10),
+  blockers: z.array(z.string().min(1)).default([]),
+  warnings: z.array(z.string().min(1)).default([]),
+  rewrittenResolutionSource: z.string().min(1),
+  rewrittenInvalidConditions: z.array(z.string().min(1)),
+  evidencePlan: z.array(z.string().min(1)),
+  requiredCapabilities: z.array(z.string().min(1)),
+  missingCapabilities: z.array(z.string().min(1)).default([]),
+  reviewerReports: z.array(importResolutionReviewerSchema),
+  reviewPolicyVersion: z.string().min(1),
+});
+
+export const marketImportReviewResponseSchema = z.object({
+  review: importResolutionReviewSchema,
+  draftPatch: z.object({
+    resolutionSource: z.string().min(1),
+    invalidConditions: z.array(z.string().min(1)),
+  }),
+});
+
 export const deployedMarketSchema = z.object({
   id: z.string().min(1),
   address: evmAddressSchema,
@@ -144,6 +189,7 @@ export const deployedMarketSchema = z.object({
   invalidConditions: z.array(z.string().min(1)).optional(),
   imageUrl: z.string().url().optional(),
   sourceIdea: marketSourceIdeaSchema.optional(),
+  importReview: importResolutionReviewSchema.optional(),
   creationBond: z.string().regex(/^\d+$/),
   initialLiquidity: z.string().regex(/^\d+$/),
   yesTokenId: z.string().regex(/^\d+$/),
@@ -194,6 +240,9 @@ export type EvidencePacketResponse = z.infer<typeof evidencePacketResponseSchema
 export type MarketFactoryArgs = z.infer<typeof marketFactoryArgsSchema>;
 export type MarketDraftResponse = z.infer<typeof marketDraftResponseSchema>;
 export type MarketSourceIdea = z.infer<typeof marketSourceIdeaSchema>;
+export type ImportResolutionReviewer = z.infer<typeof importResolutionReviewerSchema>;
+export type ImportResolutionReview = z.infer<typeof importResolutionReviewSchema>;
+export type MarketImportReviewResponse = z.infer<typeof marketImportReviewResponseSchema>;
 export type LocalActor = z.infer<typeof localActorSchema>;
 export type DeployedMarket = z.infer<typeof deployedMarketSchema>;
 export type LocalDeployment = z.infer<typeof localDeploymentSchema>;

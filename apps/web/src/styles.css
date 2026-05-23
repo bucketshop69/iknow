@@ -1774,6 +1774,23 @@ dd {
   margin: 4px 0 6px;
 }
 
+.create-review-status {
+  border: 1px solid var(--create-line);
+  border-radius: 14px;
+  background: var(--create-card-2);
+  color: var(--create-muted);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.create-review-status.ready {
+  border-color: var(--shell-yes-line);
+  color: var(--create-ink);
+}
+
 .create-primary {
   border: 0;
   border-radius: 16px;
