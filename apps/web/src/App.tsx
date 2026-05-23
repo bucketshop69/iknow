@@ -1483,7 +1483,6 @@ function MarketActionPanel({
   const potentialPayoutLabel =
     tradeMode === "BUY" && tradeQuote ? tradeQuote.outputLabel.replace(/\s(YES|NO)$/i, " USDC") : "-";
   const fundedLabel = (userState?.lpShares ?? "0 LP").replace(" LP", " funded shares");
-  const totalFundedLabel = (userState?.totalLpShares ?? "0 LP").replace(" LP", " funded shares");
 
   return (
     <aside className="market-ticket">
@@ -1589,7 +1588,7 @@ function MarketActionPanel({
             <div className="position-grid">
               <Metric label="Funded" value={userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"} />
               <Metric
-                label="Pending fees"
+                label="Fees earned"
                 value={userState?.pendingLpFees ?? (friendlyReadbackStatus ? "Unavailable" : "0 USDC")}
               />
             </div>
@@ -1633,8 +1632,8 @@ function MarketActionPanel({
               <dd>{userState?.noBalance ?? (friendlyReadbackStatus ? "Unavailable" : "0 NO")}</dd>
             </div>
             <div>
-              <dt>Funded</dt>
-              <dd>{userState ? totalFundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"}</dd>
+              <dt>Funded shares</dt>
+              <dd>{userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"}</dd>
             </div>
             <div>
               <dt>Fees earned</dt>
