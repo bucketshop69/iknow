@@ -421,6 +421,7 @@ function App() {
             market={markets.find((market) => market.id === route.marketId) ?? dataSource.getMarket(route.marketId)}
             actorId={actorId}
             dataSource={dataSource}
+            isWalletReady={actorId !== "wallet" || Boolean(connectedWalletAddress && activeWalletClient)}
             refreshKey={chainRefreshKey}
             onTransactionConfirmed={refreshChainReadbacks}
             onBack={() => navigate({ screen: "markets" })}
@@ -794,6 +795,7 @@ function MarketDetailScreen({
   market,
   actorId,
   dataSource,
+  isWalletReady,
   refreshKey,
   onTransactionConfirmed,
   onBack,
@@ -801,6 +803,7 @@ function MarketDetailScreen({
   market?: MarketReadModel;
   actorId: string;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  isWalletReady: boolean;
   refreshKey: number;
   onTransactionConfirmed: () => void;
   onBack: () => void;
@@ -913,6 +916,7 @@ function MarketDetailScreen({
         actorId={actorId}
         market={market}
         dataSource={dataSource}
+        isWalletReady={isWalletReady}
         refreshKey={refreshKey}
         onTransactionConfirmed={onTransactionConfirmed}
       />
@@ -1322,16 +1326,58 @@ function EvidenceList({
   );
 }
 
+function TicketActionProgress({
+  phase,
+  label,
+}: {
+  phase: "idle" | "pending" | "confirmed" | "error";
+  label: string | null;
+}) {
+  if (phase === "idle") {
+    return null;
+  }
+
+  const walletStepClass = phase === "error" ? "error" : "done";
+  const transactionStepClass = phase === "pending" ? "active" : phase === "confirmed" ? "done" : phase === "error" ? "error" : "";
+
+  return (
+    <div className="ticket-action-progress" aria-live="polite">
+      <div className={`ticket-step ${walletStepClass}`}>
+        <span>1</span>
+        <div>
+          <strong>Wallet approval</strong>
+          <p>{phase === "pending" ? "Approve if your wallet asks." : "Wallet step checked."}</p>
+        </div>
+      </div>
+      <div className={`ticket-step ${transactionStepClass}`}>
+        <span>2</span>
+        <div>
+          <strong>{label ?? "Action"}</strong>
+          <p>
+            {phase === "pending"
+              ? "Waiting for the transaction to land."
+              : phase === "confirmed"
+                ? "Confirmed. Refreshing this market."
+                : "Could not complete this action."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MarketActionPanel({
   actorId,
   market,
   dataSource,
+  isWalletReady,
   refreshKey,
   onTransactionConfirmed,
 }: {
   actorId: string;
   market: MarketReadModel;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  isWalletReady: boolean;
   refreshKey: number;
   onTransactionConfirmed: () => void;
 }) {
@@ -1349,6 +1395,9 @@ function MarketActionPanel({
   const [resolutionOutcome, setResolutionOutcome] = useState<ResolutionOutcomeInput>("YES");
   const [evidenceURI, setEvidenceURI] = useState("local://evidence/manual-resolution");
   const [activeTicketTab, setActiveTicketTab] = useState<"bet" | "fund">("bet");
+  const [fundMode, setFundMode] = useState<"add" | "remove">("add");
+  const [actionPhase, setActionPhase] = useState<"idle" | "pending" | "confirmed" | "error">("idle");
+  const [actionLabel, setActionLabel] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1415,12 +1464,16 @@ function MarketActionPanel({
   }, [dataSource, market.id, refreshKey, slippageBps, tradeAction, tradeAmount]);
 
   const runAction = async (label: string, action: () => Promise<string>) => {
+    setActionLabel(label);
+    setActionPhase("pending");
     setStatus(`${label} pending...`);
     try {
       const hash = await action();
+      setActionPhase("confirmed");
       setStatus(`${label} confirmed: ${shortAddress(hash)}`);
       onTransactionConfirmed();
     } catch (caught) {
+      setActionPhase("error");
       setStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : `${label} failed`);
     }
   };
@@ -1483,6 +1536,30 @@ function MarketActionPanel({
   const potentialPayoutLabel =
     tradeMode === "BUY" && tradeQuote ? tradeQuote.outputLabel.replace(/\s(YES|NO)$/i, " USDC") : "-";
   const fundedLabel = (userState?.lpShares ?? "0 LP").replace(" LP", " funded shares");
+  const pendingAction = actionPhase === "pending";
+  const marketPrice = (tradeSide === "YES" ? market.yesPrice : market.noPrice) * 100;
+  const quoteOutputNumber = tradeQuote ? Number(BigInt(tradeQuote.amountOut)) / 1_000_000 : 0;
+  const tradeAmountNumber = Number(tradeAmount);
+  const effectivePrice =
+    tradeQuote && quoteOutputNumber > 0 && Number.isFinite(tradeAmountNumber) && tradeAmountNumber > 0
+      ? tradeMode === "BUY"
+        ? (tradeAmountNumber / quoteOutputNumber) * 100
+        : (quoteOutputNumber / tradeAmountNumber) * 100
+      : null;
+  const priceImpactLabel =
+    effectivePrice === null
+      ? "-"
+      : `${effectivePrice.toFixed(1)}¢ effective, ${(effectivePrice - marketPrice >= 0 ? "+" : "")}${(
+          effectivePrice - marketPrice
+        ).toFixed(1)}¢ vs market`;
+  const actionBlockReason = !isWalletReady
+    ? "Connect your wallet before sending an Arc Testnet action."
+    : !isOpenMarket
+      ? `This market is ${lifecycleStatus.toLowerCase()}, so betting and funding are closed.`
+      : null;
+  const canSendUserAction = !actionBlockReason && !pendingAction;
+  const fundAmountLabel = `${liquidityAmount || "0"} USDC`;
+  const removeSharesLabel = `${removeShares || "0"} funded shares`;
 
   return (
     <aside className="market-ticket">
@@ -1537,7 +1614,7 @@ function MarketActionPanel({
             </div>
 
             <label>
-              You pay
+              {tradeMode === "BUY" ? "You pay" : "You sell"}
               <input inputMode="decimal" value={tradeAmount} onChange={(event) => setTradeAmount(event.target.value)} />
             </label>
             <label>
@@ -1562,12 +1639,18 @@ function MarketActionPanel({
                 <dd>{tradeQuote?.feeLabel ?? "-"}</dd>
               </div>
               <div>
+                <dt>Price impact</dt>
+                <dd>{priceImpactLabel}</dd>
+              </div>
+              <div>
                 <dt>Minimum received</dt>
                 <dd>{tradeQuote?.minOutputLabel ?? "-"}</dd>
               </div>
             </dl>
             {quoteStatus && <p className={isTradeQuoteError ? "error-text" : "status-text"}>{quoteStatus}</p>}
-            <button disabled={!isOpenMarket} onClick={() => runTrade(tradeAction)}>
+            <TicketActionProgress phase={actionPhase} label={actionLabel} />
+            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
+            <button disabled={!canSendUserAction} onClick={() => runTrade(tradeAction)}>
               {tradeCtaLabel}
             </button>
             <p className="helper">If you called it right, claim after receipts are posted and the result is in.</p>
@@ -1577,43 +1660,69 @@ function MarketActionPanel({
             <p className="helper">
               Put USDC into this market so other people can buy Yes or No. You earn a share of fees when people trade.
             </p>
-            <label>
-              Money to fund
-              <input
-                inputMode="decimal"
-                value={liquidityAmount}
-                onChange={(event) => setLiquidityAmount(event.target.value)}
-              />
-            </label>
+            <div className="trade-mode-buttons">
+              <button type="button" className={fundMode === "add" ? "active" : ""} onClick={() => setFundMode("add")}>
+                Add money
+              </button>
+              <button type="button" className={fundMode === "remove" ? "active" : ""} onClick={() => setFundMode("remove")}>
+                Remove
+              </button>
+            </div>
+            {fundMode === "add" ? (
+              <label>
+                Money to fund
+                <input
+                  inputMode="decimal"
+                  value={liquidityAmount}
+                  onChange={(event) => setLiquidityAmount(event.target.value)}
+                />
+              </label>
+            ) : (
+              <label>
+                Funded shares to remove
+                <input inputMode="decimal" value={removeShares} onChange={(event) => setRemoveShares(event.target.value)} />
+              </label>
+            )}
             <div className="position-grid">
-              <Metric label="Funded" value={userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"} />
+              <Metric label="Funded shares" value={userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"} />
               <Metric
                 label="Fees earned"
                 value={userState?.pendingLpFees ?? (friendlyReadbackStatus ? "Unavailable" : "0 USDC")}
               />
             </div>
+            <dl className="ticket-quote">
+              <div>
+                <dt>{fundMode === "add" ? "You add" : "You remove"}</dt>
+                <dd>{fundMode === "add" ? fundAmountLabel : removeSharesLabel}</dd>
+              </div>
+              <div>
+                <dt>Current market pool</dt>
+                <dd>{market.liquidity}</dd>
+              </div>
+              <div>
+                <dt>Your funded shares</dt>
+                <dd>{userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"}</dd>
+              </div>
+              <div>
+                <dt>Fees earned</dt>
+                <dd>{userState?.pendingLpFees ?? (friendlyReadbackStatus ? "Unavailable" : "0 USDC")}</dd>
+              </div>
+            </dl>
+            <TicketActionProgress phase={actionPhase} label={actionLabel} />
+            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
             <button
-              disabled={!isOpenMarket}
-              onClick={() => runAction("Fund market", () => dataSource.executeAddLiquidity(actorId, market.id, liquidityAmount))}
+              disabled={!canSendUserAction}
+              onClick={() =>
+                fundMode === "add"
+                  ? runAction("Fund market", () => dataSource.executeAddLiquidity(actorId, market.id, liquidityAmount))
+                  : runAction("Remove money", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
+              }
             >
-              Fund market
+              {fundMode === "add" ? "Fund market" : "Remove money"}
             </button>
             <p className="risk-note">
               This is not a fixed return. The amount you can withdraw can change as the market moves.
             </p>
-            <label>
-              Funded shares to remove
-              <input inputMode="decimal" value={removeShares} onChange={(event) => setRemoveShares(event.target.value)} />
-            </label>
-            <button
-              className="secondary"
-              disabled={!isOpenMarket}
-              onClick={() =>
-                runAction("Remove money", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
-              }
-            >
-              Remove money
-            </button>
           </div>
         )}
 
