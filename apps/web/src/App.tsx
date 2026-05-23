@@ -72,6 +72,28 @@ const routePath = (route: Route) => {
 const shortAddress = (address?: string) =>
   address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not deployed";
 
+const friendlyErrorMessage = (message: string) => {
+  const lower = message.toLowerCase();
+
+  if (/invalidaddress|invalid address/.test(lower)) {
+    return "Connect your wallet to see your position and send Arc Testnet actions.";
+  }
+  if (lower.includes("user rejected") || lower.includes("rejected the request")) {
+    return "Transaction cancelled in your wallet.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("http request failed") || lower.includes("network")) {
+    return "Network or RPC is unavailable. Refresh and try again.";
+  }
+  if (lower.includes("insufficient")) {
+    return "Not enough balance for this action.";
+  }
+  if (lower.includes("revert") || lower.includes("execution reverted")) {
+    return "The contract rejected this action. Check the amount, wallet balance, and market status.";
+  }
+
+  return message.length > 180 ? "This action could not be completed. Check the market status and try again." : message;
+};
+
 type BrowserEthereumProvider = Parameters<typeof custom>[0];
 
 declare global {
@@ -815,7 +837,7 @@ function MarketDetailScreen({
           <div className="market-price-card yes">
             <span>YES</span>
             <strong>{Math.round(market.yesPrice * 100)}¢</strong>
-            <small>Current market call</small>
+            <small>Current price</small>
           </div>
           <div className="market-price-card no">
             <span>NO</span>
@@ -855,8 +877,6 @@ function MarketDetailScreen({
           </div>
         </section>
 
-        <MarketRecordSection market={market} />
-
         <section className="market-detail-section">
           <div className="section-header">
             <div>
@@ -867,10 +887,10 @@ function MarketDetailScreen({
           <div className="money-panel">
             <div>
               <strong>Providers earn when people trade on this market.</strong>
-              <p>Liquidity can move up or down before the result because the market keeps balancing YES and NO.</p>
+              <p>Funded money can move up or down before the result because the market keeps balancing YES and NO.</p>
             </div>
             <div className="money-stats">
-              <Metric label="Liquidity" value={market.liquidity} />
+              <Metric label="Funded pool" value={market.liquidity} />
               <Metric label="24h volume" value={market.volume24h} />
               <Metric label="YES reserve" value={market.yesReserve} />
               <Metric label="NO reserve" value={market.noReserve} />
@@ -878,14 +898,15 @@ function MarketDetailScreen({
           </div>
         </section>
 
-        <EvidenceBriefPanel
+        <ReceiptSummarySection market={market} />
+        <MarketLifecycleSection actorId={actorId} market={market} dataSource={dataSource} refreshKey={refreshKey} />
+        <MarketTechnicalDetails
           actorId={actorId}
           market={market}
           dataSource={dataSource}
           refreshKey={refreshKey}
           onTransactionConfirmed={onTransactionConfirmed}
         />
-        <MarketLifecycleSection actorId={actorId} market={market} dataSource={dataSource} refreshKey={refreshKey} />
       </div>
 
       <MarketActionPanel
@@ -899,36 +920,87 @@ function MarketDetailScreen({
   );
 }
 
-function MarketRecordSection({ market }: { market: MarketReadModel }) {
+function ReceiptSummarySection({ market }: { market: MarketReadModel }) {
   return (
-    <section className="market-detail-section">
+    <section className="market-detail-section receipt-section">
       <div className="section-header">
         <div>
-          <h2>Market record</h2>
-          <p>The IDs iknow uses to recognize this market and keep duplicate ideas out.</p>
+          <h2>Receipts</h2>
+          <p>Evidence and reasoning appear here near settlement.</p>
         </div>
       </div>
-      <dl className="market-record-grid">
-        <div>
-          <dt>Market address</dt>
-          <dd title={market.address}>{shortAddress(market.address)}</dd>
+      <div className="receipt-grid">
+        <div className="receipt-card">
+          <strong>Source to check</strong>
+          <p>{market.resolutionSource}</p>
         </div>
-        <div>
-          <dt>Spec hash</dt>
-          <dd title={market.specHash}>{shortAddress(market.specHash)}</dd>
+        <div className="receipt-card">
+          <strong>Agent recommendation</strong>
+          <p>Agent prepares Yes, No, or Invalid with links. Resolver still finalizes.</p>
         </div>
-        <div>
-          <dt>Metadata URI</dt>
-          <dd title={market.metadataURI}>{market.metadataURI}</dd>
-        </div>
-        {market.sourceIdea?.externalId && (
-          <div>
-            <dt>External idea ID</dt>
-            <dd title={market.sourceIdea.externalId}>{market.sourceIdea.externalId}</dd>
-          </div>
-        )}
-      </dl>
+      </div>
     </section>
+  );
+}
+
+function MarketTechnicalDetails({
+  actorId,
+  market,
+  dataSource,
+  refreshKey,
+  onTransactionConfirmed,
+}: {
+  actorId: string;
+  market: MarketReadModel;
+  dataSource: ReturnType<typeof createMarketDataSource>;
+  refreshKey: number;
+  onTransactionConfirmed: () => void;
+}) {
+  return (
+    <details className="market-detail-section technical-details">
+      <summary>
+        Resolver tools and technical record
+        <span>Hidden by default so traders and funders do not have to parse admin controls.</span>
+      </summary>
+      <div className="technical-grid">
+        <div className="technical-card">
+          <strong>Market record</strong>
+          <MarketRecordPanel market={market} />
+        </div>
+        <EvidenceBriefPanel
+          actorId={actorId}
+          market={market}
+          dataSource={dataSource}
+          refreshKey={refreshKey}
+          onTransactionConfirmed={onTransactionConfirmed}
+        />
+      </div>
+    </details>
+  );
+}
+
+function MarketRecordPanel({ market }: { market: MarketReadModel }) {
+  return (
+    <dl className="market-record-grid">
+      <div>
+        <dt>Market address</dt>
+        <dd title={market.address}>{shortAddress(market.address)}</dd>
+      </div>
+      <div>
+        <dt>Spec hash</dt>
+        <dd title={market.specHash}>{shortAddress(market.specHash)}</dd>
+      </div>
+      <div>
+        <dt>Metadata URI</dt>
+        <dd title={market.metadataURI}>{market.metadataURI}</dd>
+      </div>
+      {market.sourceIdea?.externalId && (
+        <div>
+          <dt>External idea ID</dt>
+          <dd title={market.sourceIdea.externalId}>{market.sourceIdea.externalId}</dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -1074,7 +1146,7 @@ function EvidenceBriefPanel({
       showBrief(nextBrief);
       setStatus("Evidence packet ready.");
     } catch (caught) {
-      setStatus(caught instanceof Error ? caught.message : "Prepare evidence packet failed");
+      setStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : "Prepare evidence packet failed");
     }
   };
 
@@ -1089,7 +1161,7 @@ function EvidenceBriefPanel({
       showBrief(nextBrief);
       setStatus("Evidence packet loaded.");
     } catch (caught) {
-      setStatus(caught instanceof Error ? caught.message : "Fetch evidence packet failed");
+      setStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : "Fetch evidence packet failed");
     }
   };
 
@@ -1109,7 +1181,7 @@ function EvidenceBriefPanel({
       setStatus(`Propose with evidence confirmed: ${shortAddress(hash)}`);
       onTransactionConfirmed();
     } catch (caught) {
-      setStatus(caught instanceof Error ? caught.message : "Propose with evidence failed");
+      setStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : "Propose with evidence failed");
     }
   };
 
@@ -1276,7 +1348,7 @@ function MarketActionPanel({
   const [readbackStatus, setReadbackStatus] = useState<string | null>(null);
   const [resolutionOutcome, setResolutionOutcome] = useState<ResolutionOutcomeInput>("YES");
   const [evidenceURI, setEvidenceURI] = useState("local://evidence/manual-resolution");
-  const [activeTicketTab, setActiveTicketTab] = useState<"call" | "provide">("call");
+  const [activeTicketTab, setActiveTicketTab] = useState<"bet" | "fund">("bet");
 
   useEffect(() => {
     let cancelled = false;
@@ -1300,7 +1372,7 @@ function MarketActionPanel({
         }
         setUserState(null);
         setLifecycle(null);
-        setReadbackStatus(caught instanceof Error ? caught.message : "Position readback unavailable");
+        setReadbackStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : "Position readback unavailable");
       });
 
     return () => {
@@ -1334,7 +1406,7 @@ function MarketActionPanel({
           return;
         }
         setTradeQuote(null);
-        setQuoteStatus(caught instanceof Error ? caught.message : "Quote unavailable");
+        setQuoteStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : "Quote unavailable");
       });
 
     return () => {
@@ -1349,12 +1421,12 @@ function MarketActionPanel({
       setStatus(`${label} confirmed: ${shortAddress(hash)}`);
       onTransactionConfirmed();
     } catch (caught) {
-      setStatus(caught instanceof Error ? caught.message : `${label} failed`);
+      setStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : `${label} failed`);
     }
   };
 
   const isErrorStatus = (message: string) =>
-    ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "invalid"].some((token) =>
+    ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "invalid", "unavailable", "could not"].some((token) =>
       message.toLowerCase().includes(token),
     );
 
@@ -1405,36 +1477,39 @@ function MarketActionPanel({
   const setTradeSide = (side: "YES" | "NO") => setTradeAction(`${tradeMode}_${side}` as TradeAction);
   const setTradeMode = (mode: "BUY" | "SELL") => setTradeAction(`${mode}_${tradeSide}` as TradeAction);
   const isTradeQuoteError = Boolean(quoteStatus && !quoteStatus.startsWith("Refreshing"));
-  const friendlyReadbackStatus =
-    readbackStatus && /invalidaddress|invalid address/i.test(readbackStatus)
-      ? "Connect your wallet to see your position and send Arc Testnet actions."
-      : readbackStatus;
+  const friendlyReadbackStatus = readbackStatus ? friendlyErrorMessage(readbackStatus) : null;
+  const sideLabel = tradeSide === "YES" ? "Yes" : "No";
+  const tradeCtaLabel = `${tradeMode === "BUY" ? "Buy" : "Sell"} ${sideLabel}`;
+  const potentialPayoutLabel =
+    tradeMode === "BUY" && tradeQuote ? tradeQuote.outputLabel.replace(/\s(YES|NO)$/i, " USDC") : "-";
+  const fundedLabel = (userState?.lpShares ?? "0 LP").replace(" LP", " funded shares");
+  const totalFundedLabel = (userState?.totalLpShares ?? "0 LP").replace(" LP", " funded shares");
 
   return (
     <aside className="market-ticket">
       <div className="ticket-head">
         <span>Market actions</span>
-        <h2>Join or provide money</h2>
+        <h2>Bet or fund market</h2>
       </div>
       <div className="ticket-body">
         <div className="ticket-tabs" aria-label="Market action">
           <button
             type="button"
-            className={activeTicketTab === "call" ? "active" : ""}
-            onClick={() => setActiveTicketTab("call")}
+            className={activeTicketTab === "bet" ? "active" : ""}
+            onClick={() => setActiveTicketTab("bet")}
           >
-            Make a call
+            Bet
           </button>
           <button
             type="button"
-            className={activeTicketTab === "provide" ? "active" : ""}
-            onClick={() => setActiveTicketTab("provide")}
+            className={activeTicketTab === "fund" ? "active" : ""}
+            onClick={() => setActiveTicketTab("fund")}
           >
-            Provide money
+            Fund market
           </button>
         </div>
 
-        {activeTicketTab === "call" ? (
+        {activeTicketTab === "bet" ? (
           <div className="ticket-panel">
             <div className="side-buttons">
               <button
@@ -1463,7 +1538,7 @@ function MarketActionPanel({
             </div>
 
             <label>
-              Amount
+              You pay
               <input inputMode="decimal" value={tradeAmount} onChange={(event) => setTradeAmount(event.target.value)} />
             </label>
             <label>
@@ -1476,33 +1551,35 @@ function MarketActionPanel({
             </label>
             <dl className="ticket-quote">
               <div>
-                <dt>Input</dt>
-                <dd>{tradeQuote?.inputLabel ?? "-"}</dd>
+                <dt>{tradeMode === "BUY" ? `You get about` : "You receive about"}</dt>
+                <dd>{tradeQuote?.outputLabel ?? "-"}</dd>
               </div>
               <div>
-                <dt>Expected out</dt>
-                <dd>{tradeQuote?.outputLabel ?? "-"}</dd>
+                <dt>{tradeMode === "BUY" ? `If ${sideLabel} wins` : "You sell"}</dt>
+                <dd>{tradeMode === "BUY" ? potentialPayoutLabel : tradeQuote?.inputLabel ?? "-"}</dd>
               </div>
               <div>
                 <dt>Fee</dt>
                 <dd>{tradeQuote?.feeLabel ?? "-"}</dd>
               </div>
               <div>
-                <dt>Min out</dt>
+                <dt>Minimum received</dt>
                 <dd>{tradeQuote?.minOutputLabel ?? "-"}</dd>
               </div>
             </dl>
             {quoteStatus && <p className={isTradeQuoteError ? "error-text" : "status-text"}>{quoteStatus}</p>}
             <button disabled={!isOpenMarket} onClick={() => runTrade(tradeAction)}>
-              {tradeLabel(tradeAction)}
+              {tradeCtaLabel}
             </button>
             <p className="helper">If you called it right, claim after receipts are posted and the result is in.</p>
           </div>
         ) : (
           <div className="ticket-panel">
-            <p className="helper">Help this market stay easy to join. You earn a share of fees when people trade.</p>
+            <p className="helper">
+              Put USDC into this market so other people can buy Yes or No. You earn a share of fees when people trade.
+            </p>
             <label>
-              Money to provide
+              Money to fund
               <input
                 inputMode="decimal"
                 value={liquidityAmount}
@@ -1510,7 +1587,7 @@ function MarketActionPanel({
               />
             </label>
             <div className="position-grid">
-              <Metric label="Your LP" value={userState?.lpShares ?? (friendlyReadbackStatus ? "Unavailable" : "0 LP")} />
+              <Metric label="Funded" value={userState ? fundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"} />
               <Metric
                 label="Pending fees"
                 value={userState?.pendingLpFees ?? (friendlyReadbackStatus ? "Unavailable" : "0 USDC")}
@@ -1518,19 +1595,22 @@ function MarketActionPanel({
             </div>
             <button
               disabled={!isOpenMarket}
-              onClick={() => runAction("Add liquidity", () => dataSource.executeAddLiquidity(actorId, market.id, liquidityAmount))}
+              onClick={() => runAction("Fund market", () => dataSource.executeAddLiquidity(actorId, market.id, liquidityAmount))}
             >
-              Provide money
+              Fund market
             </button>
+            <p className="risk-note">
+              This is not a fixed return. The amount you can withdraw can change as the market moves.
+            </p>
             <label>
-              LP shares to remove
+              Funded shares to remove
               <input inputMode="decimal" value={removeShares} onChange={(event) => setRemoveShares(event.target.value)} />
             </label>
             <button
               className="secondary"
               disabled={!isOpenMarket}
               onClick={() =>
-                runAction("Remove liquidity", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
+                runAction("Remove money", () => dataSource.executeRemoveLiquidity(actorId, market.id, removeShares))
               }
             >
               Remove money
@@ -1539,37 +1619,26 @@ function MarketActionPanel({
         )}
 
         <div className="ticket-position">
-          <h3>Your position</h3>
+          <div>
+            <h3>Your position in this market</h3>
+            <p className="helper">Profile shows everything. This shows only what you have here.</p>
+          </div>
           <dl className="compact-list">
             <div>
-              <dt>YES</dt>
+              <dt>Yes owned</dt>
               <dd>{userState?.yesBalance ?? (friendlyReadbackStatus ? "Unavailable" : "0 YES")}</dd>
             </div>
             <div>
-              <dt>NO</dt>
+              <dt>No owned</dt>
               <dd>{userState?.noBalance ?? (friendlyReadbackStatus ? "Unavailable" : "0 NO")}</dd>
             </div>
             <div>
-              <dt>Total LP shares</dt>
-              <dd>{userState?.totalLpShares ?? (friendlyReadbackStatus ? "Unavailable" : "0 LP")}</dd>
+              <dt>Funded</dt>
+              <dd>{userState ? totalFundedLabel : friendlyReadbackStatus ? "Unavailable" : "0 funded shares"}</dd>
             </div>
             <div>
-              <dt>Live reserves</dt>
-              <dd>
-                {userState
-                  ? `${userState.yesReserve} / ${userState.noReserve}`
-                  : friendlyReadbackStatus
-                    ? "Unavailable"
-                    : "0 / 0"}
-              </dd>
-            </div>
-            <div>
-              <dt>Lifecycle</dt>
-              <dd>{lifecycleStatus}</dd>
-            </div>
-            <div>
-              <dt>Finalize after</dt>
-              <dd>{lifecycle?.finalizeAfter ? formatDate(lifecycle.finalizeAfter) : "-"}</dd>
+              <dt>Fees earned</dt>
+              <dd>{userState?.pendingLpFees ?? (friendlyReadbackStatus ? "Unavailable" : "0 USDC")}</dd>
             </div>
           </dl>
         </div>
@@ -1579,8 +1648,11 @@ function MarketActionPanel({
           </p>
         )}
 
-        <div className="ticket-resolution">
-          <h3>Resolve and claim</h3>
+        <details className="ticket-resolution">
+          <summary>
+            Resolver tools and claims
+            <span>{lifecycleStatus}</span>
+          </summary>
         <label>
           Resolution outcome
           <select
@@ -1683,7 +1755,7 @@ function MarketActionPanel({
             <dd>{lifecycle?.creationBond ?? "0 USDC"}</dd>
           </div>
         </dl>
-        </div>
+        </details>
         {status && <p className={isErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
       </div>
     </aside>

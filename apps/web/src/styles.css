@@ -880,6 +880,58 @@ dd {
   background: var(--shell-receipt-bg);
 }
 
+.receipt-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.receipt-card,
+.technical-card {
+  border: 1px solid var(--shell-line);
+  border-radius: 18px;
+  background: var(--shell-card);
+  padding: 14px;
+}
+
+.receipt-card strong,
+.technical-card > strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.receipt-card p {
+  color: var(--shell-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.technical-details {
+  background: var(--shell-card-soft);
+}
+
+.technical-details summary,
+.ticket-resolution summary {
+  cursor: pointer;
+  font-weight: 900;
+  list-style-position: inside;
+}
+
+.technical-details summary span,
+.ticket-resolution summary span {
+  color: var(--shell-muted);
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.technical-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
 .activity-list {
   display: grid;
   gap: 10px;
@@ -1020,6 +1072,17 @@ dd {
   color: var(--shell-muted);
   font-size: 13px;
   margin: 0;
+}
+
+.risk-note {
+  border: 1px solid var(--shell-line);
+  border-radius: 16px;
+  background: var(--shell-card-soft);
+  color: var(--shell-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 12px;
 }
 
 .ticket-position,
@@ -1815,12 +1878,35 @@ dd {
   .detail-grid,
   .market-detail-workspace,
   .money-panel,
-  .rules-grid {
+  .rules-grid,
+  .receipt-grid,
+  .technical-grid {
     grid-template-columns: 1fr;
   }
 
+  .market-detail-main {
+    display: contents;
+  }
+
+  .market-hero {
+    order: 1;
+  }
+
+  .market-price-grid {
+    order: 2;
+  }
+
   .market-ticket {
+    order: 3;
     position: static;
+  }
+
+  .market-detail-section {
+    order: 4;
+  }
+
+  .technical-details {
+    order: 5;
   }
 
   .create-benefits {
@@ -1937,6 +2023,8 @@ dd {
 
   .market-price-grid,
   .market-record-grid,
+  .receipt-grid,
+  .technical-grid,
   .money-stats,
   .position-grid,
   .activity-row,
