@@ -88,8 +88,24 @@ export interface PortfolioPosition {
   yesShares: string;
   noShares: string;
   lpShares: string;
+  pendingLpFees: string;
   redeemable: string;
-  claimable: string;
+  creatorFees: string;
+  protocolFees: string;
+  creationBond: string;
+  yesSharesRaw: string;
+  noSharesRaw: string;
+  lpSharesRaw: string;
+  pendingLpFeesRaw: string;
+  redeemableRaw: string;
+  creatorFeesRaw: string;
+  protocolFeesRaw: string;
+  creationBondRaw: string;
+  isCreator: boolean;
+  canRedeem: boolean;
+  canClaimCreatorFees: boolean;
+  canClaimProtocolFees: boolean;
+  canClaimCreationBond: boolean;
 }
 
 export interface LpPositionReadback {
@@ -117,6 +133,7 @@ export interface MarketLifecycleReadback {
   creatorFeesRaw: string;
   protocolFeesRaw: string;
   creationBondRaw: string;
+  isCreator: boolean;
   canClose: boolean;
   canPropose: boolean;
   canFinalize: boolean;
@@ -168,7 +185,12 @@ export interface PortfolioReadModel {
     yesMarkets: number;
     noMarkets: number;
     lpMarkets: number;
-    claimable: string;
+    winnings: string;
+    creatorEarnings: string;
+    protocolFees: string;
+    safetyDeposit: string;
+    lpFees: string;
+    readyActions: number;
   };
 }
 

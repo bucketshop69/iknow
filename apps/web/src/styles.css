@@ -1904,15 +1904,193 @@ dd {
   color: #607086;
 }
 
-.portfolio-summary {
+.portfolio-page,
+.portfolio-layout,
+.portfolio-section,
+.portfolio-card-list,
+.portfolio-claim-card,
+.portfolio-position-card {
+  display: grid;
+  gap: 16px;
+}
+
+.portfolio-hero {
+  align-items: center;
   border: 1px solid var(--shell-line);
   border-radius: 8px;
   background: var(--shell-card);
-  margin-bottom: 16px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
+  padding: 20px;
 }
 
-.portfolio-row {
-  grid-template-columns: minmax(240px, 1fr) 132px 118px 118px 118px 132px 132px 78px;
+.portfolio-identity {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.portfolio-avatar {
+  align-items: center;
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-primary);
+  color: var(--shell-primary-ink);
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 28px;
+  font-weight: 900;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+
+.portfolio-identity p {
+  margin: 6px 0 0;
+}
+
+.portfolio-hero-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.portfolio-ready-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(230px, 1.2fr) repeat(4, minmax(160px, 1fr));
+}
+
+.portfolio-claim-card {
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-card);
+  padding: 16px;
+}
+
+.portfolio-claim-card.primary {
+  background: var(--shell-ink);
+  color: var(--shell-inverted-text);
+}
+
+.portfolio-claim-card span,
+.portfolio-section-head span {
+  color: var(--shell-muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.portfolio-claim-card.primary span,
+.portfolio-claim-card.primary p {
+  color: var(--shell-inverted-muted);
+}
+
+.portfolio-claim-card h2 {
+  font-size: 24px;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.portfolio-claim-card p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.portfolio-claim-card button {
+  align-self: end;
+  min-height: 42px;
+}
+
+.portfolio-claim-card.primary button {
+  background: var(--shell-primary);
+  color: var(--shell-primary-ink);
+}
+
+.portfolio-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+}
+
+.portfolio-layout .portfolio-section:first-child {
+  grid-row: span 2;
+}
+
+.portfolio-section-head {
+  align-items: end;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.portfolio-section-head h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.portfolio-position-card {
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-card);
+  padding: 16px;
+}
+
+.portfolio-position-top {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.portfolio-position-top h3 {
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+
+.portfolio-position-top p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.status.yes {
+  background: var(--shell-yes-bg);
+  color: var(--shell-yes);
+}
+
+.status.settled {
+  background: var(--shell-card-soft);
+  color: var(--shell-ink);
+}
+
+.portfolio-mini-list {
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-card-soft);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 12px;
+}
+
+.portfolio-mini-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.portfolio-mini-list dd {
+  font-weight: 800;
+}
+
+.portfolio-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-card-actions button {
+  min-height: 40px;
 }
 
 .empty-state {
@@ -1948,6 +2126,9 @@ dd {
   .detail-grid,
   .market-detail-workspace,
   .money-panel,
+  .portfolio-hero,
+  .portfolio-layout,
+  .portfolio-ready-grid,
   .rules-grid,
   .receipt-grid,
   .technical-grid {
@@ -2000,6 +2181,10 @@ dd {
 
   .local-demo-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .portfolio-layout .portfolio-section:first-child {
+    grid-row: auto;
   }
 
   .market-row,
@@ -2078,6 +2263,17 @@ dd {
   }
 
   .local-demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-identity,
+  .portfolio-position-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .portfolio-hero-stats,
+  .portfolio-mini-list {
     grid-template-columns: 1fr;
   }
 

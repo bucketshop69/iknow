@@ -30,6 +30,7 @@ import type {
   MarketUserState,
   MarketImportCandidate,
   MarketReadModel,
+  PortfolioPosition,
   PortfolioReadModel,
   Route,
 } from "./types";
@@ -93,6 +94,11 @@ const friendlyErrorMessage = (message: string) => {
 
   return message.length > 180 ? "This action could not be completed. Check the market status and try again." : message;
 };
+
+const looksLikeErrorStatus = (message: string) =>
+  ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "invalid", "unavailable", "could not"].some((token) =>
+    message.toLowerCase().includes(token),
+  );
 
 type BrowserEthereumProvider = Parameters<typeof custom>[0];
 
@@ -441,7 +447,10 @@ function App() {
           <PortfolioScreen
             actorId={actorId}
             dataSource={dataSource}
+            chainName={surface.chainName || "Arc Testnet"}
+            isWalletReady={actorId !== "wallet" || Boolean(connectedWalletAddress && activeWalletClient)}
             refreshKey={chainRefreshKey}
+            onTransactionConfirmed={refreshChainReadbacks}
             onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
           />
         )}
@@ -1339,6 +1348,7 @@ function TicketActionProgress({
 
   const walletStepClass = phase === "error" ? "error" : "done";
   const transactionStepClass = phase === "pending" ? "active" : phase === "confirmed" ? "done" : phase === "error" ? "error" : "";
+  const confirmedCopy = label?.startsWith("Claim") ? "Claim confirmed. Refreshing this market." : "Confirmed. Refreshing this market.";
 
   return (
     <div className="ticket-action-progress" aria-live="polite">
@@ -1346,7 +1356,7 @@ function TicketActionProgress({
         <span>1</span>
         <div>
           <strong>Wallet approval</strong>
-          <p>{phase === "pending" ? "Approve if your wallet asks." : "Wallet step checked."}</p>
+          <p>{phase === "pending" ? "Approve in your wallet." : "Wallet step checked."}</p>
         </div>
       </div>
       <div className={`ticket-step ${transactionStepClass}`}>
@@ -1355,9 +1365,9 @@ function TicketActionProgress({
           <strong>{label ?? "Action"}</strong>
           <p>
             {phase === "pending"
-              ? "Waiting for the transaction to land."
+              ? "Confirming on Arc Testnet."
               : phase === "confirmed"
-                ? "Confirmed. Refreshing this market."
+                ? confirmedCopy
                 : "Could not complete this action."}
           </p>
         </div>
@@ -1478,11 +1488,6 @@ function MarketActionPanel({
     }
   };
 
-  const isErrorStatus = (message: string) =>
-    ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "invalid", "unavailable", "could not"].some((token) =>
-      message.toLowerCase().includes(token),
-    );
-
   const lifecycleStatus = lifecycle
     ? lifecycle.state === "Resolved"
       ? `Resolved ${lifecycle.finalOutcome}`
@@ -1558,8 +1563,20 @@ function MarketActionPanel({
       ? `This market is ${lifecycleStatus.toLowerCase()}, so betting and funding are closed.`
       : null;
   const canSendUserAction = !actionBlockReason && !pendingAction;
+  const settlementBlockReason = !isWalletReady ? "Connect your wallet before claiming from Arc Testnet." : null;
+  const canSendSettlementAction = !settlementBlockReason && !pendingAction;
   const fundAmountLabel = `${liquidityAmount || "0"} USDC`;
   const removeSharesLabel = `${removeShares || "0"} funded shares`;
+  const userHasCall = Boolean(userState && (BigInt(userState.yesBalanceRaw) > 0n || BigInt(userState.noBalanceRaw) > 0n));
+  const settlementStatus = lifecycle?.canRedeem
+    ? `Claim ${lifecycle.redeemable}`
+    : lifecycle?.state === "Resolved"
+      ? userHasCall
+        ? "No winnings to claim"
+        : "Winnings claimed"
+      : lifecycle?.state === "Resolution proposed" || lifecycle?.state === "Closed"
+        ? "Waiting for result"
+        : "Live";
 
   return (
     <aside className="market-ticket">
@@ -1756,9 +1773,39 @@ function MarketActionPanel({
           </p>
         )}
 
+        <div className="ticket-settlement">
+          <div>
+            <h3>Claim after result</h3>
+            <p className="helper">
+              {lifecycle?.canRedeem
+                ? "Receipts are posted and your winning call is ready."
+                : lifecycle?.state === "Resolved"
+                  ? settlementStatus
+                  : "Your call can be claimed after the market resolves."}
+            </p>
+          </div>
+          <dl className="ticket-quote">
+            <div>
+              <dt>Winnings</dt>
+              <dd>{lifecycle?.redeemable ?? "0 USDC"}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{settlementStatus}</dd>
+            </div>
+          </dl>
+          {settlementBlockReason && <p className="ticket-blocker">{settlementBlockReason}</p>}
+          <button
+            disabled={!canSendSettlementAction || !lifecycle?.canRedeem}
+            onClick={() => runAction("Claim winnings", () => dataSource.executeRedeem(actorId, market.id))}
+          >
+            Claim winnings
+          </button>
+        </div>
+
         <details className="ticket-resolution">
           <summary>
-            Resolver tools and claims
+            Resolver and admin tools
             <span>{lifecycleStatus}</span>
           </summary>
         <label>
@@ -1819,16 +1866,18 @@ function MarketActionPanel({
           <button
             className="secondary"
             disabled={!lifecycle?.canRedeem}
-            onClick={() => runAction("Redeem", () => dataSource.executeRedeem(actorId, market.id))}
+            onClick={() => runAction("Claim winnings", () => dataSource.executeRedeem(actorId, market.id))}
           >
-            Redeem
+            Claim winnings
           </button>
           <button
             className="secondary"
             disabled={!lifecycle?.canClaimCreatorFees}
-            onClick={() => runAction("Claim creator fees", () => dataSource.executeClaimCreatorFees(actorId, market.id))}
+            onClick={() =>
+              runAction("Claim creator earnings", () => dataSource.executeClaimCreatorFees(actorId, market.id))
+            }
           >
-            Claim creator
+            Claim creator earnings
           </button>
           <button
             className="secondary"
@@ -1840,14 +1889,14 @@ function MarketActionPanel({
           <button
             className="secondary"
             disabled={!lifecycle?.canClaimCreationBond}
-            onClick={() => runAction("Claim creation bond", () => dataSource.executeClaimCreationBond(actorId, market.id))}
+            onClick={() => runAction("Claim safety deposit", () => dataSource.executeClaimCreationBond(actorId, market.id))}
           >
-            Claim bond
+            Claim safety deposit
           </button>
         </div>
         <dl className="compact-list ticket-claim-list">
           <div>
-            <dt>Redeemable</dt>
+            <dt>Winnings</dt>
             <dd>{lifecycle?.redeemable ?? "0 USDC"}</dd>
           </div>
           <div>
@@ -1864,7 +1913,7 @@ function MarketActionPanel({
           </div>
         </dl>
         </details>
-        {status && <p className={isErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
+        {status && <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
       </div>
     </aside>
   );
@@ -2462,17 +2511,26 @@ function DraftPreview({
 function PortfolioScreen({
   actorId,
   dataSource,
+  chainName,
+  isWalletReady,
   refreshKey,
+  onTransactionConfirmed,
   onOpenMarket,
 }: {
   actorId: string;
   dataSource: ReturnType<typeof createMarketDataSource>;
+  chainName: string;
+  isWalletReady: boolean;
   refreshKey: number;
+  onTransactionConfirmed: () => void;
   onOpenMarket: (marketId: string) => void;
 }) {
   const staticPortfolio = dataSource.getPortfolio(actorId);
   const [livePortfolio, setLivePortfolio] = useState<PortfolioReadModel | null>(null);
   const [lpReadbackStatus, setLpReadbackStatus] = useState<string | null>(null);
+  const [actionPhase, setActionPhase] = useState<"idle" | "pending" | "confirmed" | "error">("idle");
+  const [actionLabel, setActionLabel] = useState<string | null>(null);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2507,62 +2565,399 @@ function PortfolioScreen({
       staticPortfolio.positions.some((position) => position.lpShares !== "0")),
   );
   const portfolio = shouldUseLivePortfolio && livePortfolio ? livePortfolio : staticPortfolio;
+  const calls = portfolio.positions.filter((position) => hasTokenPosition(position));
+  const funding = portfolio.positions.filter((position) => rawAmountIsPositive(position.lpSharesRaw));
+  const createdMarkets = portfolio.positions.filter(
+    (position) =>
+      position.isCreator ||
+      rawAmountIsPositive(position.creatorFeesRaw) ||
+      rawAmountIsPositive(position.creationBondRaw) ||
+      position.canClaimCreatorFees ||
+      position.canClaimCreationBond,
+  );
+  const claimActions = portfolio.positions.flatMap((position) => claimActionsForPosition(position));
+  const readyActions = claimActions.filter((action) => action.enabled);
+  const lpFeeActions = funding.filter((position) => rawAmountIsPositive(position.pendingLpFeesRaw));
+  const primaryReadyAction = readyActions[0];
+
+  const runPortfolioAction = async (label: string, action: () => Promise<string>) => {
+    setActionLabel(label);
+    setActionPhase("pending");
+    setActionStatus("Approve in your wallet");
+    try {
+      const hash = await action();
+      setActionPhase("confirmed");
+      setActionStatus(`Claim confirmed: ${shortAddress(hash)}`);
+      onTransactionConfirmed();
+    } catch (caught) {
+      setActionPhase("error");
+      setActionStatus(caught instanceof Error ? friendlyErrorMessage(caught.message) : `${label} failed`);
+    }
+  };
+
+  const executeClaimAction = (action: PortfolioClaimAction) => {
+    if (action.kind === "winnings") {
+      return runPortfolioAction(action.label, () => dataSource.executeRedeem(actorId, action.marketId));
+    }
+    if (action.kind === "creator") {
+      return runPortfolioAction(action.label, () => dataSource.executeClaimCreatorFees(actorId, action.marketId));
+    }
+    if (action.kind === "bond") {
+      return runPortfolioAction(action.label, () => dataSource.executeClaimCreationBond(actorId, action.marketId));
+    }
+    return runPortfolioAction(action.label, () => dataSource.executeClaimProtocolFees(actorId, action.marketId));
+  };
 
   return (
-    <>
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Profile</p>
-          <h1>Your iknow</h1>
+    <div className="portfolio-page">
+      <section className="portfolio-hero">
+        <div className="portfolio-identity">
+          <div className="portfolio-avatar" aria-hidden="true">
+            {portfolio.actor.name.slice(0, 1)}
+          </div>
+          <div>
+            <p className="eyebrow">Your iknow</p>
+            <h1>{portfolio.actor.name}</h1>
+            <p>
+              {shortAddress(portfolio.actor.address)} · {chainName} · {isWalletReady ? "Wallet ready" : "Wallet not connected"}
+            </p>
+          </div>
         </div>
-        <span className="count-pill">{shortAddress(portfolio.actor.address)}</span>
-      </header>
-
-      <section className="metric-grid portfolio-summary">
-        <Metric label="YES markets" value={String(portfolio.totals.yesMarkets)} />
-        <Metric label="NO markets" value={String(portfolio.totals.noMarkets)} />
-        <Metric label="LP markets" value={String(portfolio.totals.lpMarkets)} />
-        <Metric label="Claimable" value={portfolio.totals.claimable} />
+        <div className="portfolio-hero-stats">
+          <Metric label="Markets joined" value={String(calls.length)} />
+          <Metric label="Markets funded" value={String(funding.length)} />
+          <Metric label="Ready to claim" value={String(readyActions.length)} />
+          <Metric label="USDC balance" value={portfolio.actor.usdcBalance} />
+        </div>
       </section>
       {lpReadbackStatus && !livePortfolio && (
         <p className={lpReadbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{lpReadbackStatus}</p>
       )}
 
-      <section className="market-table" aria-label="Portfolio positions">
-        <div className="market-row portfolio-row table-head">
-          <span>Market</span>
-          <span>Status</span>
-          <span>YES</span>
-          <span>NO</span>
-          <span>LP</span>
-          <span>Redeemable</span>
-          <span>Claimable</span>
-          <span />
-        </div>
-        {portfolio.positions.length === 0 && (
-          <div className="empty-state inline">
-            <h2>No positions</h2>
-          </div>
-        )}
-        {portfolio.positions.map((position) => (
-          <article className="market-row portfolio-row" key={position.marketId}>
-            <div>
-              <h2>{position.marketQuestion}</h2>
-              <p>{position.resolution}</p>
-            </div>
-            <span className="status">{position.status}</span>
-            <span>{position.yesShares}</span>
-            <span>{position.noShares}</span>
-            <span>{position.lpShares}</span>
-            <span>{position.redeemable}</span>
-            <span>{position.claimable}</span>
-            <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-              Open
-            </button>
-          </article>
-        ))}
+      <section className="portfolio-ready-grid" aria-label="Ready for you">
+        <article className="portfolio-claim-card primary">
+          <span>Ready for you</span>
+          <h2>{primaryReadyAction?.amount ?? "0 USDC"}</h2>
+          <p>{primaryReadyAction ? `${primaryReadyAction.label} is ready.` : "No balances are ready right now."}</p>
+          <button disabled={!primaryReadyAction || !isWalletReady || actionPhase === "pending"} onClick={() => primaryReadyAction && executeClaimAction(primaryReadyAction)}>
+            {primaryReadyAction?.label ?? "Nothing to claim"}
+          </button>
+        </article>
+        <MoneyActionCard
+          label="Claim winnings"
+          value={portfolio.totals.winnings}
+          helper="Winning resolved calls ready to collect."
+          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "winnings")}
+          onClick={() => {
+            const action = readyActions.find((candidate) => candidate.kind === "winnings");
+            if (action) {
+              executeClaimAction(action);
+            }
+          }}
+        />
+        <MoneyActionCard
+          label="Claim creator earnings"
+          value={portfolio.totals.creatorEarnings}
+          helper="Fees from markets you created."
+          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "creator")}
+          onClick={() => {
+            const action = readyActions.find((candidate) => candidate.kind === "creator");
+            if (action) {
+              executeClaimAction(action);
+            }
+          }}
+        />
+        <MoneyActionCard
+          label="Claim safety deposit"
+          value={portfolio.totals.safetyDeposit}
+          helper="Creation bond returned after valid resolution."
+          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "bond")}
+          onClick={() => {
+            const action = readyActions.find((candidate) => candidate.kind === "bond");
+            if (action) {
+              executeClaimAction(action);
+            }
+          }}
+        />
+        <MoneyActionCard
+          label="Remove funding to collect fees"
+          value={portfolio.totals.lpFees}
+          helper="Fees earned by funding. Remove funding from the market to collect."
+          disabled={lpFeeActions.length === 0}
+          onClick={() => {
+            const position = lpFeeActions[0] ?? funding[0];
+            if (position) {
+              onOpenMarket(position.marketId);
+            }
+          }}
+        />
       </section>
-    </>
+      <TicketActionProgress phase={actionPhase} label={actionLabel} />
+      {actionStatus && <p className={looksLikeErrorStatus(actionStatus) ? "error-text" : "status-text"}>{actionStatus}</p>}
+
+      <div className="portfolio-layout">
+        <section className="portfolio-section">
+          <div className="portfolio-section-head">
+            <div>
+              <h2>Your calls</h2>
+              <span>Markets where you bought YES or NO.</span>
+            </div>
+          </div>
+          <div className="portfolio-card-list">
+            {calls.length === 0 && (
+              <div className="empty-state inline">
+                <h2>No active positions yet</h2>
+              </div>
+            )}
+            {calls.map((position) => {
+              const winningAction = claimActionsForPosition(position).find((action) => action.kind === "winnings");
+              return (
+                <article className="portfolio-position-card" key={`call-${position.marketId}`}>
+                  <div className="portfolio-position-top">
+                    <div>
+                      <h3>{position.marketQuestion}</h3>
+                      <p>{positionCallLabel(position)}</p>
+                    </div>
+                    <span className={`status ${positionStatusTone(position)}`}>{positionClaimStatus(position)}</span>
+                  </div>
+                  <dl className="portfolio-mini-list">
+                    <div>
+                      <dt>YES</dt>
+                      <dd>{position.yesShares}</dd>
+                    </div>
+                    <div>
+                      <dt>NO</dt>
+                      <dd>{position.noShares}</dd>
+                    </div>
+                    <div>
+                      <dt>Winnings</dt>
+                      <dd>{position.redeemable}</dd>
+                    </div>
+                  </dl>
+                  <div className="portfolio-card-actions">
+                    <button
+                      disabled={!winningAction?.enabled || !isWalletReady || actionPhase === "pending"}
+                      onClick={() => winningAction && executeClaimAction(winningAction)}
+                    >
+                      Claim winnings
+                    </button>
+                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                      View market
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="portfolio-section">
+          <div className="portfolio-section-head">
+            <div>
+              <h2>Funding</h2>
+              <span>Markets where you provided liquidity.</span>
+            </div>
+          </div>
+          <div className="portfolio-card-list">
+            {funding.length === 0 && (
+              <div className="empty-state inline">
+                <h2>No funding positions</h2>
+              </div>
+            )}
+            {funding.map((position) => (
+              <article className="portfolio-position-card" key={`funding-${position.marketId}`}>
+                <div className="portfolio-position-top">
+                  <div>
+                    <h3>{position.marketQuestion}</h3>
+                    <p>Fees earned: {position.pendingLpFees}</p>
+                  </div>
+                  <span className="status">{position.status}</span>
+                </div>
+                <dl className="portfolio-mini-list">
+                  <div>
+                    <dt>Funded shares</dt>
+                    <dd>{position.lpShares}</dd>
+                  </div>
+                  <div>
+                    <dt>Fees earned</dt>
+                    <dd>{position.pendingLpFees}</dd>
+                  </div>
+                </dl>
+                <div className="portfolio-card-actions">
+                  <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                    Remove funding to collect
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="portfolio-section">
+          <div className="portfolio-section-head">
+            <div>
+              <h2>Markets you created</h2>
+              <span>Creator earnings and safety deposit status.</span>
+            </div>
+          </div>
+          <div className="portfolio-card-list">
+            {createdMarkets.length === 0 && (
+              <div className="empty-state inline">
+                <h2>No creator balances</h2>
+              </div>
+            )}
+            {createdMarkets.map((position) => {
+              const creatorActions = claimActionsForPosition(position).filter((action) => action.kind === "creator" || action.kind === "bond");
+              return (
+                <article className="portfolio-position-card" key={`created-${position.marketId}`}>
+                  <div className="portfolio-position-top">
+                    <div>
+                      <h3>{position.marketQuestion}</h3>
+                      <p>{position.status === "Resolved" ? `Resolved ${position.resolution}` : position.status}</p>
+                    </div>
+                    <span className="status">{creatorActions.some((action) => action.enabled) ? "Ready to claim" : "Waiting for result"}</span>
+                  </div>
+                  <dl className="portfolio-mini-list">
+                    <div>
+                      <dt>Creator earnings</dt>
+                      <dd>{position.creatorFees}</dd>
+                    </div>
+                    <div>
+                      <dt>Safety deposit</dt>
+                      <dd>{position.creationBond}</dd>
+                    </div>
+                  </dl>
+                  <div className="portfolio-card-actions">
+                    {creatorActions.map((action) => (
+                      <button
+                        key={`${action.kind}-${action.marketId}`}
+                        disabled={!action.enabled || !isWalletReady || actionPhase === "pending"}
+                        onClick={() => executeClaimAction(action)}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                      View market
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+type PortfolioClaimAction = {
+  kind: "winnings" | "creator" | "bond" | "protocol";
+  label: string;
+  amount: string;
+  enabled: boolean;
+  marketId: string;
+};
+
+function rawAmountIsPositive(value: string) {
+  try {
+    return BigInt(value) > 0n;
+  } catch {
+    return value !== "0" && value.trim() !== "";
+  }
+}
+
+function hasTokenPosition(position: PortfolioPosition) {
+  return rawAmountIsPositive(position.yesSharesRaw) || rawAmountIsPositive(position.noSharesRaw);
+}
+
+function positionCallLabel(position: PortfolioPosition) {
+  const picked = [
+    rawAmountIsPositive(position.yesSharesRaw) ? `YES ${position.yesShares}` : null,
+    rawAmountIsPositive(position.noSharesRaw) ? `NO ${position.noShares}` : null,
+  ].filter(Boolean);
+
+  return picked.length > 0 ? `You picked ${picked.join(" and ")}` : "No active position";
+}
+
+function positionClaimStatus(position: PortfolioPosition) {
+  if (position.canRedeem) {
+    return "Ready to claim";
+  }
+  if (position.status === "Resolved") {
+    return hasTokenPosition(position) ? "No winnings to claim" : "Winnings claimed";
+  }
+  if (position.status === "Closed" || position.status === "Resolution proposed") {
+    return "Waiting for result";
+  }
+  return "Live";
+}
+
+function positionStatusTone(position: PortfolioPosition) {
+  if (position.canRedeem) {
+    return "yes";
+  }
+  if (position.status === "Resolved") {
+    return "settled";
+  }
+  return "";
+}
+
+function claimActionsForPosition(position: PortfolioPosition): PortfolioClaimAction[] {
+  return [
+    {
+      kind: "winnings",
+      label: "Claim winnings",
+      amount: position.redeemable,
+      enabled: position.canRedeem,
+      marketId: position.marketId,
+    },
+    {
+      kind: "creator",
+      label: "Claim creator earnings",
+      amount: position.creatorFees,
+      enabled: position.canClaimCreatorFees,
+      marketId: position.marketId,
+    },
+    {
+      kind: "bond",
+      label: "Claim safety deposit",
+      amount: position.creationBond,
+      enabled: position.canClaimCreationBond,
+      marketId: position.marketId,
+    },
+    {
+      kind: "protocol",
+      label: "Claim protocol fees",
+      amount: position.protocolFees,
+      enabled: position.canClaimProtocolFees,
+      marketId: position.marketId,
+    },
+  ];
+}
+
+function MoneyActionCard({
+  label,
+  value,
+  helper,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <article className="portfolio-claim-card">
+      <span>{label}</span>
+      <h2>{value}</h2>
+      <p>{helper}</p>
+      <button className="secondary" disabled={disabled} onClick={onClick}>
+        {label}
+      </button>
+    </article>
   );
 }
 

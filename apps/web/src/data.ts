@@ -493,8 +493,24 @@ export function createMarketDataSource(
             yesShares: "0",
             noShares: "0",
             lpShares: "500 seeded",
+            pendingLpFees: "Fees earned after trades",
             redeemable: "0 USDC",
-            claimable: "LP fees pending",
+            creatorFees: "0 USDC",
+            protocolFees: "0 USDC",
+            creationBond: "0 USDC",
+            yesSharesRaw: "0",
+            noSharesRaw: "0",
+            lpSharesRaw: "1",
+            pendingLpFeesRaw: "0",
+            redeemableRaw: "0",
+            creatorFeesRaw: "0",
+            protocolFeesRaw: "0",
+            creationBondRaw: "0",
+            isCreator: false,
+            canRedeem: false,
+            canClaimCreatorFees: false,
+            canClaimProtocolFees: false,
+            canClaimCreationBond: false,
           }))
         : actor.role === "TraderYes"
           ? markets.slice(0, 1).map((market) => ({
@@ -505,19 +521,41 @@ export function createMarketDataSource(
               yesShares: "Seeded buy",
               noShares: "0",
               lpShares: "0",
+              pendingLpFees: "0 USDC",
               redeemable: "Pending resolution",
-              claimable: "Pending resolution",
+              creatorFees: "0 USDC",
+              protocolFees: "0 USDC",
+              creationBond: "0 USDC",
+              yesSharesRaw: "1",
+              noSharesRaw: "0",
+              lpSharesRaw: "0",
+              pendingLpFeesRaw: "0",
+              redeemableRaw: "0",
+              creatorFeesRaw: "0",
+              protocolFeesRaw: "0",
+              creationBondRaw: "0",
+              isCreator: false,
+              canRedeem: false,
+              canClaimCreatorFees: false,
+              canClaimProtocolFees: false,
+              canClaimCreationBond: false,
             }))
           : [];
 
+      const zeroTotal = "0 USDC";
       return {
         actor,
         positions,
         totals: {
-          yesMarkets: positions.filter((position) => position.yesShares !== "0").length,
-          noMarkets: positions.filter((position) => position.noShares !== "0").length,
-          lpMarkets: positions.filter((position) => position.lpShares !== "0").length,
-          claimable: positions.length > 0 ? "Open" : "0 USDC",
+          yesMarkets: positions.filter((position) => position.yesSharesRaw !== "0").length,
+          noMarkets: positions.filter((position) => position.noSharesRaw !== "0").length,
+          lpMarkets: positions.filter((position) => position.lpSharesRaw !== "0").length,
+          winnings: zeroTotal,
+          creatorEarnings: zeroTotal,
+          protocolFees: zeroTotal,
+          safetyDeposit: zeroTotal,
+          lpFees: zeroTotal,
+          readyActions: 0,
         },
       };
     },
@@ -1112,6 +1150,7 @@ async function readMarketLifecycle(
     creatorFeesRaw: creatorFeePool.toString(),
     protocolFeesRaw: protocolFeePool.toString(),
     creationBondRaw: creationBond.toString(),
+    isCreator,
     canClose: stateNumber === 0 && now >= closeTime,
     canPropose: isResolver && (stateNumber === 1 || (stateNumber === 0 && now >= closeTime)),
     canFinalize: stateNumber === 2 && now >= finalizeAfter,
@@ -1208,13 +1247,14 @@ async function readLpPortfolio(
     }),
   );
   const activeReadbacks = readbacks.filter(
-    ({ userState, claimableRaw }) =>
+    ({ lifecycle, userState, claimableRaw }) =>
       BigInt(userState.yesBalanceRaw) > 0n ||
       BigInt(userState.noBalanceRaw) > 0n ||
       BigInt(userState.lpSharesRaw) > 0n ||
+      lifecycle.isCreator ||
       claimableRaw > 0n,
   );
-  const positions = activeReadbacks.map(({ market, lifecycle, userState, claimableRaw }) => ({
+  const positions = activeReadbacks.map(({ market, lifecycle, userState }) => ({
     marketId: market.id,
     marketQuestion: market.question,
     status: lifecycle.state,
@@ -1222,19 +1262,65 @@ async function readLpPortfolio(
     yesShares: userState.yesBalance,
     noShares: userState.noBalance,
     lpShares: userState.lpShares,
+    pendingLpFees: userState.pendingLpFees,
     redeemable: lifecycle.redeemable,
-    claimable: `${displayUnits(claimableRaw, deployment.contracts.usdc.decimals)} USDC`,
+    creatorFees: lifecycle.creatorFees,
+    protocolFees: lifecycle.protocolFees,
+    creationBond: lifecycle.creationBond,
+    yesSharesRaw: userState.yesBalanceRaw,
+    noSharesRaw: userState.noBalanceRaw,
+    lpSharesRaw: userState.lpSharesRaw,
+    pendingLpFeesRaw: userState.pendingLpFeesRaw,
+    redeemableRaw: lifecycle.redeemableRaw,
+    creatorFeesRaw: lifecycle.creatorFeesRaw,
+    protocolFeesRaw: lifecycle.protocolFeesRaw,
+    creationBondRaw: lifecycle.creationBondRaw,
+    isCreator: lifecycle.isCreator,
+    canRedeem: lifecycle.canRedeem,
+    canClaimCreatorFees: lifecycle.canClaimCreatorFees,
+    canClaimProtocolFees: lifecycle.canClaimProtocolFees,
+    canClaimCreationBond: lifecycle.canClaimCreationBond,
   }));
-  const claimable = activeReadbacks.reduce((total, position) => total + position.claimableRaw, 0n);
+  const winnings = activeReadbacks.reduce(
+    (total, { lifecycle }) => total + (lifecycle.canRedeem ? BigInt(lifecycle.redeemableRaw) : 0n),
+    0n,
+  );
+  const creatorEarnings = activeReadbacks.reduce(
+    (total, { lifecycle }) => total + (lifecycle.canClaimCreatorFees ? BigInt(lifecycle.creatorFeesRaw) : 0n),
+    0n,
+  );
+  const protocolFees = activeReadbacks.reduce(
+    (total, { lifecycle }) => total + (lifecycle.canClaimProtocolFees ? BigInt(lifecycle.protocolFeesRaw) : 0n),
+    0n,
+  );
+  const safetyDeposit = activeReadbacks.reduce(
+    (total, { lifecycle }) => total + (lifecycle.canClaimCreationBond ? BigInt(lifecycle.creationBondRaw) : 0n),
+    0n,
+  );
+  const lpFees = activeReadbacks.reduce((total, { userState }) => total + BigInt(userState.pendingLpFeesRaw), 0n);
+  const readyActions = activeReadbacks.reduce(
+    (total, { lifecycle }) =>
+      total +
+      Number(lifecycle.canRedeem) +
+      Number(lifecycle.canClaimCreatorFees) +
+      Number(lifecycle.canClaimProtocolFees) +
+      Number(lifecycle.canClaimCreationBond),
+    0,
+  );
 
   return {
     actor,
     positions,
     totals: {
-      yesMarkets: positions.filter((position) => position.yesShares !== "0").length,
-      noMarkets: positions.filter((position) => position.noShares !== "0").length,
-      lpMarkets: positions.filter((position) => position.lpShares !== "0 LP").length,
-      claimable: `${displayUnits(claimable, deployment.contracts.usdc.decimals)} USDC`,
+      yesMarkets: positions.filter((position) => position.yesSharesRaw !== "0").length,
+      noMarkets: positions.filter((position) => position.noSharesRaw !== "0").length,
+      lpMarkets: positions.filter((position) => position.lpSharesRaw !== "0").length,
+      winnings: `${displayUnits(winnings, deployment.contracts.usdc.decimals)} USDC`,
+      creatorEarnings: `${displayUnits(creatorEarnings, deployment.contracts.usdc.decimals)} USDC`,
+      protocolFees: `${displayUnits(protocolFees, deployment.contracts.usdc.decimals)} USDC`,
+      safetyDeposit: `${displayUnits(safetyDeposit, deployment.contracts.usdc.decimals)} USDC`,
+      lpFees: `${displayUnits(lpFees, deployment.contracts.usdc.decimals)} USDC`,
+      readyActions,
     },
   };
 }
