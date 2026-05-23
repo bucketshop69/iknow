@@ -3,6 +3,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import type { DeployedMarket } from "@iknow/shared";
 import {
   indexTestnetMarketCreatedEvents,
   marketFromMarketCreatedEvent,
@@ -258,7 +259,7 @@ test("normalizes Arc MarketCreated events into deployment market records", () =>
 });
 
 test("indexes Arc MarketCreated events while preserving rich existing metadata", () => {
-  const existingMarket = {
+  const existingMarket: DeployedMarket = {
     id: "rich-market",
     address: "0x00000000000000000000000000000000000000AA",
     specHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
@@ -273,6 +274,28 @@ test("indexes Arc MarketCreated events while preserving rich existing metadata",
       externalId: "btc-150k",
       question: "Will Bitcoin hit $150k by June 30, 2026?",
       closeTime: "2026-07-01T04:00:00.000Z",
+    },
+    importReview: {
+      status: "ready",
+      resolverMode: "autonomous",
+      resolverTemplate: "general-agent",
+      score: 9,
+      blockers: [],
+      warnings: [],
+      rewrittenResolutionSource: "Agents check Binance BTC/USDT high price.",
+      rewrittenInvalidConditions: ["Wrong exchange."],
+      evidencePlan: ["Read Binance candles."],
+      requiredCapabilities: ["Public price lookup"],
+      missingCapabilities: [],
+      reviewerReports: [
+        {
+          role: "policy",
+          score: 9,
+          verdict: "pass",
+          reasons: ["Resolution path is objective."],
+        },
+      ],
+      reviewPolicyVersion: "market-import-review-llm-v1",
     },
     creationBond: "5000000",
     initialLiquidity: "10000000",
@@ -340,5 +363,6 @@ test("indexes Arc MarketCreated events while preserving rich existing metadata",
   assert.equal(result.deployment.markets[1].id, "rich-market");
   assert.equal(result.deployment.markets[1].question, "Will Bitcoin hit $150k by June 30, 2026?");
   assert.equal(result.deployment.markets[1].imageUrl, "https://example.com/btc.png");
+  assert.equal(result.deployment.markets[1].importReview?.reviewPolicyVersion, "market-import-review-llm-v1");
   assert.equal(result.deployment.markets[0].id, "arc-000000cc");
 });

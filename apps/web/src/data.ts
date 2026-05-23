@@ -1970,6 +1970,11 @@ function normalizeEvidenceLinks(value: unknown) {
           `Evidence ${index + 1}`,
         url,
         source: stringValue(record, "source") ?? stringValue(record, "publisher"),
+        timestamp:
+          stringValue(record, "timestamp") ??
+          stringValue(record, "publishedAt") ??
+          stringValue(record, "checkedAt") ??
+          stringValue(record, "retrievedAt"),
       },
     ];
   });

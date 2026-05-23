@@ -26,6 +26,7 @@ import type {
   CreateDraftInput,
   DevActor,
   EvidenceBriefReadModel,
+  EvidenceInvalidCheckReadModel,
   MarketLifecycleReadback,
   MarketUserState,
   MarketImportCandidate,
@@ -141,6 +142,16 @@ const formatConfidence = (value: number | null) => {
   }
 
   return `${Math.round(value * 100)}%`;
+};
+
+const confidencePercent = (value: number | null) => (value === null ? 0 : Math.max(0, Math.min(100, Math.round(value * 100))));
+
+const formatEvidenceTimestamp = (value?: string) => {
+  if (!value) {
+    return "Timestamp pending";
+  }
+
+  return formatDate(value);
 };
 
 const isUrl = (value: string) => /^https?:\/\//i.test(value);
@@ -910,15 +921,15 @@ function MarketDetailScreen({
           </div>
         </section>
 
-        <ReceiptSummarySection market={market} />
-        <MarketLifecycleSection actorId={actorId} market={market} dataSource={dataSource} refreshKey={refreshKey} />
-        <MarketTechnicalDetails
+        <EvidenceBriefPanel
           actorId={actorId}
           market={market}
           dataSource={dataSource}
           refreshKey={refreshKey}
           onTransactionConfirmed={onTransactionConfirmed}
         />
+        <MarketLifecycleSection actorId={actorId} market={market} dataSource={dataSource} refreshKey={refreshKey} />
+        <MarketTechnicalDetails market={market} />
       </div>
 
       <MarketActionPanel
@@ -933,60 +944,18 @@ function MarketDetailScreen({
   );
 }
 
-function ReceiptSummarySection({ market }: { market: MarketReadModel }) {
-  return (
-    <section className="market-detail-section receipt-section">
-      <div className="section-header">
-        <div>
-          <h2>Receipts</h2>
-          <p>Evidence and reasoning appear here near settlement.</p>
-        </div>
-      </div>
-      <div className="receipt-grid">
-        <div className="receipt-card">
-          <strong>Source to check</strong>
-          <p>{market.resolutionSource}</p>
-        </div>
-        <div className="receipt-card">
-          <strong>Agent recommendation</strong>
-          <p>Agent prepares Yes, No, or Invalid with links. Resolver still finalizes.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MarketTechnicalDetails({
-  actorId,
-  market,
-  dataSource,
-  refreshKey,
-  onTransactionConfirmed,
-}: {
-  actorId: string;
-  market: MarketReadModel;
-  dataSource: ReturnType<typeof createMarketDataSource>;
-  refreshKey: number;
-  onTransactionConfirmed: () => void;
-}) {
+function MarketTechnicalDetails({ market }: { market: MarketReadModel }) {
   return (
     <details className="market-detail-section technical-details">
       <summary>
         Resolver tools and technical record
         <span>Hidden by default so traders and funders do not have to parse admin controls.</span>
       </summary>
-      <div className="technical-grid">
+      <div className="technical-grid technical-grid-single">
         <div className="technical-card">
           <strong>Market record</strong>
           <MarketRecordPanel market={market} />
         </div>
-        <EvidenceBriefPanel
-          actorId={actorId}
-          market={market}
-          dataSource={dataSource}
-          refreshKey={refreshKey}
-          onTransactionConfirmed={onTransactionConfirmed}
-        />
       </div>
     </details>
   );
@@ -1201,21 +1170,64 @@ function EvidenceBriefPanel({
   const isResolverActor = actorId === "resolver";
   const canPrepare = lifecycle?.state === "Closed" || Boolean(lifecycle?.canPropose);
   const canPropose = Boolean(isResolverActor && lifecycle?.canPropose && brief && brief.suggestedOutcome !== "UNKNOWN");
-  const isErrorStatus = Boolean(
-    status &&
-      ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "unavailable"].some((token) =>
-        status.toLowerCase().includes(token),
-      ),
-  );
+  const verdict = brief?.suggestedOutcome ?? (lifecycle?.finalOutcome !== "Unresolved" ? lifecycle?.finalOutcome : lifecycle?.proposedOutcome);
+  const resolverStage =
+    lifecycle?.state === "Resolved"
+      ? "Finalized"
+      : lifecycle?.state === "Resolution proposed"
+        ? "Challenge window"
+        : brief
+          ? "Evidence ready"
+          : canPrepare
+            ? "Ready for evidence"
+            : "Waiting for close";
+  const panelMode =
+    lifecycle?.state === "Resolved" ? "finalized" : lifecycle?.state === "Resolution proposed" ? "proposed" : brief ? "prepared" : "waiting";
+  const sourceCount = brief?.evidenceLinks.length ?? 0;
+  const checkSummary = summarizeInvalidChecks(brief?.invalidChecks ?? []);
 
   return (
-    <section className="market-detail-section evidence-card receipt-section">
+    <section className={`market-detail-section evidence-card receipt-section evidence-card-${panelMode}`}>
       <div className="section-header">
         <div>
           <h2>Receipts</h2>
-          <p>Agent evidence and reasoning will live here when the market is ready to resolve.</p>
+          <p>Resolver evidence, policy checks, and packet-backed settlement controls.</p>
         </div>
-        <span className="status">{lifecycle?.state ?? "Lifecycle unavailable"}</span>
+        <span className="status">{resolverStage}</span>
+      </div>
+
+      <div className="resolver-dashboard">
+        <ResolverTimeline lifecycle={lifecycle} brief={brief} market={market} />
+
+        <div className="verdict-card">
+          <div>
+            <span>{lifecycle?.state === "Resolved" ? "Final outcome" : "Agent verdict"}</span>
+            <strong>{verdict && verdict !== "Unresolved" ? verdict : "Pending"}</strong>
+            <p>
+              {brief
+                ? `${brief.agentId} generated this packet ${formatEvidenceTimestamp(brief.generatedAt).toLowerCase()}.`
+                : "Prepare or fetch a packet to light up the evidence record."}
+            </p>
+          </div>
+          <div className="confidence-ring" style={{ "--confidence": `${confidencePercent(brief?.confidence ?? null)}%` } as CSSProperties}>
+            <strong>{formatConfidence(brief?.confidence ?? null)}</strong>
+            <span>confidence</span>
+          </div>
+          <div className="verdict-meta-grid">
+            <div>
+              <span>Policy</span>
+              <strong>{brief?.policyStatus ?? "Pending"}</strong>
+            </div>
+            <div>
+              <span>Sources</span>
+              <strong>{sourceCount}</strong>
+            </div>
+            <div>
+              <span>Invalid checks</span>
+              <strong>{checkSummary}</strong>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="evidence-controls">
@@ -1237,75 +1249,162 @@ function EvidenceBriefPanel({
       {!isResolverActor && (
         <p className="status-text">Switch to the Resolver actor to submit the packet-backed proposal.</p>
       )}
-      {status && <p className={isErrorStatus ? "error-text" : "status-text"}>{status}</p>}
+      {status && <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
 
-      {brief ? <EvidenceBriefView brief={brief} /> : <p className="empty-copy">No evidence packet loaded.</p>}
+      {brief ? (
+        <EvidenceBriefView brief={brief} lifecycle={lifecycle} />
+      ) : (
+        <div className="evidence-empty-state">
+          <strong>Evidence packet not loaded yet</strong>
+          <p>Use Prepare packet for the current market, or Fetch packet with a saved evidence id or URI.</p>
+        </div>
+      )}
     </section>
   );
 }
 
-function EvidenceBriefView({ brief }: { brief: EvidenceBriefReadModel }) {
+function ResolverTimeline({
+  lifecycle,
+  brief,
+  market,
+}: {
+  lifecycle: MarketLifecycleReadback | null;
+  brief: EvidenceBriefReadModel | null;
+  market: MarketReadModel;
+}) {
+  const state = lifecycle?.state ?? market.status;
+  const steps = [
+    {
+      key: "waiting",
+      label: "Waiting",
+      detail: `Closes ${formatDate(market.closeTime)}`,
+      status: state === "Open" || state === "Closing soon" ? "active" : "done",
+    },
+    {
+      key: "closed",
+      label: "Closed",
+      detail: lifecycle?.canClose ? "Ready to close on-chain" : state === "Open" ? "Close window pending" : "Close readback complete",
+      status: state === "Closed" ? "active" : state === "Resolution proposed" || state === "Resolved" ? "done" : "waiting",
+    },
+    {
+      key: "evidence",
+      label: "Evidence",
+      detail: brief ? `Packet ${brief.id}` : lifecycle?.evidenceURI ? lifecycle.evidenceURI : "Packet pending",
+      status: brief || lifecycle?.evidenceURI ? "done" : state === "Closed" ? "active" : "waiting",
+    },
+    {
+      key: "proposed",
+      label: "Proposed",
+      detail: lifecycle?.proposedOutcome && lifecycle.proposedOutcome !== "Unresolved" ? lifecycle.proposedOutcome : "Resolver has not proposed",
+      status: state === "Resolution proposed" ? "active" : state === "Resolved" ? "done" : "waiting",
+    },
+    {
+      key: "challenge",
+      label: "Challenge",
+      detail: lifecycle?.finalizeAfter ? `Finalize after ${formatDate(lifecycle.finalizeAfter)}` : "Challenge clock starts after proposal",
+      status: state === "Resolution proposed" ? "active" : state === "Resolved" ? "done" : "waiting",
+    },
+    {
+      key: "finalized",
+      label: "Finalized",
+      detail: lifecycle?.finalOutcome && lifecycle.finalOutcome !== "Unresolved" ? lifecycle.finalOutcome : "Awaiting final outcome",
+      status: state === "Resolved" ? "done" : "waiting",
+    },
+  ];
+
+  return (
+    <ol className="resolver-timeline" aria-label="Resolver evidence timeline">
+      {steps.map((step) => (
+        <li className={`resolver-timeline-step ${step.status}`} key={step.key}>
+          <span />
+          <div>
+            <strong>{step.label}</strong>
+            <p>{step.detail}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function summarizeInvalidChecks(checks: EvidenceInvalidCheckReadModel[]) {
+  if (checks.length === 0) {
+    return "Pending";
+  }
+  const failed = checks.filter((check) => check.status === "fail").length;
+  const unknown = checks.filter((check) => check.status === "unknown").length;
+  if (failed > 0) {
+    return `${failed} fail`;
+  }
+  if (unknown > 0) {
+    return `${unknown} warn`;
+  }
+
+  return "All pass";
+}
+
+function EvidenceBriefView({
+  brief,
+  lifecycle,
+}: {
+  brief: EvidenceBriefReadModel;
+  lifecycle: MarketLifecycleReadback | null;
+}) {
+  const outcomeLabel =
+    lifecycle?.state === "Resolved" && lifecycle.finalOutcome !== "Unresolved"
+      ? lifecycle.finalOutcome
+      : lifecycle?.state === "Resolution proposed" && lifecycle.proposedOutcome !== "Unresolved"
+        ? lifecycle.proposedOutcome
+        : brief.suggestedOutcome;
+  const outcomeMode = lifecycle?.state === "Resolved" ? "finalized" : lifecycle?.state === "Resolution proposed" ? "proposed" : "suggested";
+
   return (
     <div className="evidence-brief">
-      <dl className="compact-list evidence-summary">
-        <div>
-          <dt>Suggested outcome</dt>
-          <dd>{brief.suggestedOutcome}</dd>
-        </div>
-        <div>
-          <dt>Confidence</dt>
-          <dd>{formatConfidence(brief.confidence)}</dd>
-        </div>
-        <div>
-          <dt>Policy status</dt>
-          <dd>{brief.policyStatus}</dd>
-        </div>
-        <div>
-          <dt>Generated at</dt>
-          <dd>{formatDate(brief.generatedAt)}</dd>
-        </div>
-        <div>
-          <dt>Agent id</dt>
-          <dd>{brief.agentId}</dd>
-        </div>
-        <div>
-          <dt>Evidence URI</dt>
-          <dd>{brief.evidenceURI}</dd>
-        </div>
-      </dl>
+      <div className={`settlement-state ${outcomeMode}`}>
+        <span>{outcomeMode === "finalized" ? "Finalized on-chain" : outcomeMode === "proposed" ? "Proposed, challengeable" : "Suggested by agent"}</span>
+        <strong>{outcomeLabel}</strong>
+        <code>{brief.evidenceURI}</code>
+      </div>
 
       <div className="evidence-columns">
-        <EvidenceList title="Agent reasoning" emptyLabel="No reasoning returned.">
+        <EvidenceList title="Extracted facts" emptyLabel="No facts returned.">
           {brief.facts.map((fact) => (
-            <li key={`${fact.label}-${fact.value}`}>
+            <li className="fact-row" key={`${fact.label}-${fact.value}`}>
               <strong>{fact.label}</strong>
               <span>{fact.value}</span>
             </li>
           ))}
         </EvidenceList>
 
-        <EvidenceList title="Evidence links" emptyLabel="No evidence links returned.">
+        <EvidenceList title="Source stack" emptyLabel="No evidence links returned.">
           {brief.evidenceLinks.map((link) => (
-            <li key={`${link.label}-${link.url}`}>
-              <strong>{link.label}</strong>
-              {isUrl(link.url) ? (
-                <a href={link.url} target="_blank" rel="noreferrer">
-                  {link.source ?? link.url}
-                </a>
-              ) : (
-                <span>{link.source ? `${link.source}: ${link.url}` : link.url}</span>
-              )}
+            <li className="source-row" key={`${link.label}-${link.url}`}>
+              <div>
+                <strong>{link.label}</strong>
+                <small>{link.source ?? "Evidence source"} / {formatEvidenceTimestamp(link.timestamp ?? brief.generatedAt)}</small>
+              </div>
+              <span>
+                {isUrl(link.url) ? (
+                  <a href={link.url} target="_blank" rel="noreferrer">
+                    {link.url}
+                  </a>
+                ) : (
+                  link.url
+                )}
+              </span>
             </li>
           ))}
         </EvidenceList>
 
         <EvidenceList title="Invalid checks" emptyLabel="No invalid checks returned.">
           {brief.invalidChecks.map((check) => (
-            <li key={`${check.label}-${check.status}`}>
-              <strong>{check.label}</strong>
+            <li className={`check-row ${check.status}`} key={`${check.label}-${check.status}`}>
+              <strong>
+                <span className={`check-status ${check.status}`}>{check.status === "unknown" ? "warn" : check.status}</span>
+                {check.label}
+              </strong>
               <span>
-                <span className={`check-status ${check.status}`}>{check.status}</span>
-                {check.note ? ` ${check.note}` : ""}
+                {check.note ?? (check.status === "pass" ? "No invalid trigger found." : "Needs resolver review.")}
               </span>
             </li>
           ))}

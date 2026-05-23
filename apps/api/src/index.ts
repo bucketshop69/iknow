@@ -15,6 +15,7 @@ import { createEvidencePacketResponse, prepareEvidencePacketResponse, readEviden
 import { MARKET_IMPORT_TAGS, listMarketImportCandidates } from "./marketImport.js";
 import { logMarketImportReview, reviewMarketImportCandidate } from "./marketImportReview.js";
 import { createMarketDraftResponse } from "./marketDraft.js";
+import { createMarketResolutionStatus, findDeploymentMarket, type DeploymentScope } from "./resolutionStatus.js";
 
 loadEnv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.env") });
 
@@ -37,6 +38,46 @@ app.post("/markets/draft", async (c) => {
         message: error instanceof Error ? error.message : "Market draft is invalid",
       },
       400,
+    );
+  }
+});
+
+app.get("/markets/:marketId/resolution-status", async (c) => {
+  const rawScope = c.req.query("scope") ?? "testnet";
+  if (rawScope !== "local" && rawScope !== "testnet") {
+    return c.json(
+      {
+        error: "INVALID_DEPLOYMENT_SCOPE",
+        message: "Resolution status scope must be local or testnet",
+      },
+      400,
+    );
+  }
+
+  const scope = rawScope as DeploymentScope;
+
+  try {
+    const deployment = scope === "local" ? await readLocalDeployment() : await readTestnetDeployment();
+    const market = findDeploymentMarket(deployment, c.req.param("marketId"));
+
+    if (!market) {
+      return c.json(
+        {
+          error: "MARKET_NOT_FOUND",
+          message: `Market ${c.req.param("marketId")} was not found in ${scope} deployment`,
+        },
+        404,
+      );
+    }
+
+    return c.json(await createMarketResolutionStatus({ scope, deployment, market }));
+  } catch (error) {
+    return c.json(
+      {
+        error: scope === "local" ? "LOCAL_DEPLOYMENT_NOT_READY" : "TESTNET_DEPLOYMENT_NOT_READY",
+        message: error instanceof Error ? error.message : "Unable to read deployment artifact",
+      },
+      503,
     );
   }
 });

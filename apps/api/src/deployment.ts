@@ -274,6 +274,7 @@ export function marketFromMarketCreatedEvent(event: MarketCreatedEventLike, exis
     invalidConditions: existing?.invalidConditions ?? [],
     imageUrl: existing?.imageUrl,
     sourceIdea: existing?.sourceIdea,
+    importReview: existing?.importReview,
     creationBond: creationBond.toString(),
     initialLiquidity: initialLiquidity.toString(),
     yesTokenId: outcomeTokenId(address, 0),

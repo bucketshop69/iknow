@@ -155,6 +155,7 @@ export interface EvidenceLinkReadModel {
   label: string;
   url: string;
   source?: string;
+  timestamp?: string;
 }
 
 export interface EvidenceInvalidCheckReadModel {
