@@ -154,6 +154,34 @@ const formatEvidenceTimestamp = (value?: string) => {
   return formatDate(value);
 };
 
+const splitSentences = (value: string) =>
+  value
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const compactRuleText = (value: string, maxSentences = 2) => {
+  const sentences = splitSentences(value);
+  const compact = sentences.slice(0, maxSentences).join(" ");
+
+  return compact || value;
+};
+
+const evidencePlanItems = (resolutionSource: string) => {
+  const [, plan = ""] = resolutionSource.split(/Evidence plan:/i);
+  if (!plan.trim()) {
+    return [];
+  }
+
+  return plan
+    .split(/(?=(?:FIFA|Official|Major|Check|Verify|Monitor|Cross-reference|Consensus|Source|Public)\b)|[;\n]/)
+    .map((item) => item.trim().replace(/[. ]+$/g, ""))
+    .filter((item) => item.length > 8)
+    .slice(0, 4);
+};
+
+const uniqueRules = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+
 const isUrl = (value: string) => /^https?:\/\//i.test(value);
 
 const toDateTimeLocal = (date: Date) => {
@@ -837,6 +865,12 @@ function MarketDetailScreen({
     );
   }
 
+  const invalidConditions = uniqueRules(market.invalidConditions);
+  const visibleInvalidConditions = invalidConditions.slice(0, 4);
+  const hiddenInvalidConditions = invalidConditions.slice(4);
+  const sourceSummary = compactRuleText(market.resolutionSource);
+  const evidenceItems = evidencePlanItems(market.resolutionSource);
+
   return (
     <section className="market-detail-workspace">
       <div className="market-detail-main">
@@ -869,34 +903,65 @@ function MarketDetailScreen({
           </div>
         </section>
 
-        <section className="market-detail-section">
+        <section className="market-detail-section rules-brief">
           <div className="section-header">
             <div>
               <h2>What this means</h2>
-              <p>Plain rules before anyone joins.</p>
+              <p>How the market gets judged.</p>
             </div>
           </div>
-          <div className="rules-grid">
-            <div className="rule-note">
-              <strong>Where to check the result</strong>
+
+          <div className="rule-hero">
+            <div>
+              <span>Source of truth</span>
+              <strong>{sourceSummary}</strong>
+              {evidenceItems.length > 0 && (
+                <div className="rule-source-stack" aria-label="Evidence plan">
+                  {evidenceItems.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <details className="rule-full-details">
+              <summary>Full rules</summary>
               <p>{market.resolutionSource}</p>
-            </div>
-            <div className="rule-note">
-              <strong>NO wins if</strong>
+            </details>
+          </div>
+
+          <div className="rule-strips">
+            <details className="rule-strip yes">
+              <summary>
+                <span>YES</span>
+                <strong>Wins if the event in the question happens.</strong>
+              </summary>
+              <p>Agents verify the result against the source above.</p>
+            </details>
+            <details className="rule-strip no">
+              <summary>
+                <span>NO</span>
+                <strong>Wins if the event does not happen.</strong>
+              </summary>
               <p>The YES condition is not met before the market closes.</p>
-            </div>
-            <div className="rule-note">
-              <strong>Invalid conditions</strong>
-              {market.invalidConditions.length > 0 ? (
+            </details>
+            <details className="rule-strip invalid">
+              <summary>
+                <span>INVALID</span>
+                <strong>Used only for clear edge cases.</strong>
+              </summary>
+              {visibleInvalidConditions.length > 0 ? (
                 <ul>
-                  {market.invalidConditions.map((condition) => (
+                  {visibleInvalidConditions.map((condition) => (
+                    <li key={condition}>{condition}</li>
+                  ))}
+                  {hiddenInvalidConditions.map((condition) => (
                     <li key={condition}>{condition}</li>
                   ))}
                 </ul>
               ) : (
                 <p>No invalid conditions listed.</p>
               )}
-            </div>
+            </details>
           </div>
         </section>
 
@@ -2657,6 +2722,7 @@ function PortfolioScreen({
   const [actionPhase, setActionPhase] = useState<"idle" | "pending" | "confirmed" | "error">("idle");
   const [actionLabel, setActionLabel] = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [portfolioTab, setPortfolioTab] = useState<"calls" | "funding" | "created">("calls");
 
   useEffect(() => {
     let cancelled = false;
@@ -2821,158 +2887,193 @@ function PortfolioScreen({
       <TicketActionProgress phase={actionPhase} label={actionLabel} />
       {actionStatus && <p className={looksLikeErrorStatus(actionStatus) ? "error-text" : "status-text"}>{actionStatus}</p>}
 
-      <div className="portfolio-layout">
-        <section className="portfolio-section">
-          <div className="portfolio-section-head">
-            <div>
-              <h2>Your calls</h2>
-              <span>Markets where you bought YES or NO.</span>
-            </div>
+      <section className="portfolio-section portfolio-profile-panel">
+        <div className="portfolio-section-head">
+          <div>
+            <h2>Your profile</h2>
+            <span>Calls, funding, and markets you created in one table.</span>
           </div>
-          <div className="portfolio-card-list">
-            {calls.length === 0 && (
+        </div>
+
+        <div className="portfolio-tab-list" role="tablist" aria-label="Profile sections">
+          <button
+            className={`portfolio-tab ${portfolioTab === "calls" ? "active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={portfolioTab === "calls"}
+            onClick={() => setPortfolioTab("calls")}
+          >
+            Your calls <span>{calls.length}</span>
+          </button>
+          <button
+            className={`portfolio-tab ${portfolioTab === "funding" ? "active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={portfolioTab === "funding"}
+            onClick={() => setPortfolioTab("funding")}
+          >
+            Funding <span>{funding.length}</span>
+          </button>
+          <button
+            className={`portfolio-tab ${portfolioTab === "created" ? "active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={portfolioTab === "created"}
+            onClick={() => setPortfolioTab("created")}
+          >
+            Created <span>{createdMarkets.length}</span>
+          </button>
+        </div>
+
+        {portfolioTab === "calls" && (
+          <div className="portfolio-tab-panel" role="tabpanel">
+            {calls.length === 0 ? (
               <div className="empty-state inline">
                 <h2>No active positions yet</h2>
               </div>
+            ) : (
+              <div className="portfolio-table calls">
+                <div className="portfolio-table-row table-head">
+                  <span>Market</span>
+                  <span>Pick</span>
+                  <span>Position</span>
+                  <span>Status</span>
+                  <span>Action</span>
+                </div>
+                {calls.map((position) => {
+                  const winningAction = claimActionsForPosition(position).find((action) => action.kind === "winnings");
+                  const hasYes = rawAmountIsPositive(position.yesSharesRaw);
+                  const hasNo = rawAmountIsPositive(position.noSharesRaw);
+                  const pickLabel = hasYes && hasNo ? "YES + NO" : hasYes ? "YES" : "NO";
+                  const positionLabel = [
+                    hasYes ? `${position.yesShares} YES` : null,
+                    hasNo ? `${position.noShares} NO` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" / ");
+                  return (
+                    <div className="portfolio-table-row" key={`call-${position.marketId}`}>
+                      <div className="portfolio-table-market">
+                        <strong>{position.marketQuestion}</strong>
+                        <span>{positionCallLabel(position)}</span>
+                      </div>
+                      <div className="portfolio-table-cell">
+                        <strong>{pickLabel}</strong>
+                      </div>
+                      <div className="portfolio-table-cell">
+                        <strong>{positionLabel}</strong>
+                        <span>shares</span>
+                      </div>
+                      <span className={`status ${positionStatusTone(position)}`}>{positionClaimStatus(position)}</span>
+                      {winningAction?.enabled ? (
+                        <button disabled={!isWalletReady || actionPhase === "pending"} onClick={() => executeClaimAction(winningAction)}>
+                          Claim
+                        </button>
+                      ) : (
+                        <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                          View market
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
-            {calls.map((position) => {
-              const winningAction = claimActionsForPosition(position).find((action) => action.kind === "winnings");
-              return (
-                <article className="portfolio-position-card" key={`call-${position.marketId}`}>
-                  <div className="portfolio-position-top">
-                    <div>
-                      <h3>{position.marketQuestion}</h3>
-                      <p>{positionCallLabel(position)}</p>
-                    </div>
-                    <span className={`status ${positionStatusTone(position)}`}>{positionClaimStatus(position)}</span>
-                  </div>
-                  <dl className="portfolio-mini-list">
-                    <div>
-                      <dt>YES</dt>
-                      <dd>{position.yesShares}</dd>
-                    </div>
-                    <div>
-                      <dt>NO</dt>
-                      <dd>{position.noShares}</dd>
-                    </div>
-                    <div>
-                      <dt>Winnings</dt>
-                      <dd>{position.redeemable}</dd>
-                    </div>
-                  </dl>
-                  <div className="portfolio-card-actions">
-                    <button
-                      disabled={!winningAction?.enabled || !isWalletReady || actionPhase === "pending"}
-                      onClick={() => winningAction && executeClaimAction(winningAction)}
-                    >
-                      Claim winnings
-                    </button>
-                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                      View market
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
           </div>
-        </section>
+        )}
 
-        <section className="portfolio-section">
-          <div className="portfolio-section-head">
-            <div>
-              <h2>Funding</h2>
-              <span>Markets where you provided liquidity.</span>
-            </div>
-          </div>
-          <div className="portfolio-card-list">
-            {funding.length === 0 && (
+        {portfolioTab === "funding" && (
+          <div className="portfolio-tab-panel" role="tabpanel">
+            {funding.length === 0 ? (
               <div className="empty-state inline">
                 <h2>No funding positions</h2>
               </div>
+            ) : (
+              <div className="portfolio-table funding">
+                <div className="portfolio-table-row table-head">
+                  <span>Market</span>
+                  <span>Funded</span>
+                  <span>Fees earned</span>
+                  <span>Status</span>
+                  <span>Action</span>
+                </div>
+                {funding.map((position) => (
+                  <div className="portfolio-table-row" key={`funding-${position.marketId}`}>
+                    <div className="portfolio-table-market">
+                      <strong>{position.marketQuestion}</strong>
+                      <span>Liquidity provider</span>
+                    </div>
+                    <div className="portfolio-table-cell">
+                      <strong>{position.lpShares}</strong>
+                    </div>
+                    <div className="portfolio-table-cell">
+                      <strong>{position.pendingLpFees}</strong>
+                    </div>
+                    <span className="status">{position.status}</span>
+                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-            {funding.map((position) => (
-              <article className="portfolio-position-card" key={`funding-${position.marketId}`}>
-                <div className="portfolio-position-top">
-                  <div>
-                    <h3>{position.marketQuestion}</h3>
-                    <p>Fees earned: {position.pendingLpFees}</p>
-                  </div>
-                  <span className="status">{position.status}</span>
-                </div>
-                <dl className="portfolio-mini-list">
-                  <div>
-                    <dt>Funded shares</dt>
-                    <dd>{position.lpShares}</dd>
-                  </div>
-                  <div>
-                    <dt>Fees earned</dt>
-                    <dd>{position.pendingLpFees}</dd>
-                  </div>
-                </dl>
-                <div className="portfolio-card-actions">
-                  <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                    Remove funding to collect
-                  </button>
-                </div>
-              </article>
-            ))}
           </div>
-        </section>
+        )}
 
-        <section className="portfolio-section">
-          <div className="portfolio-section-head">
-            <div>
-              <h2>Markets you created</h2>
-              <span>Creator earnings and safety deposit status.</span>
-            </div>
-          </div>
-          <div className="portfolio-card-list">
-            {createdMarkets.length === 0 && (
+        {portfolioTab === "created" && (
+          <div className="portfolio-tab-panel" role="tabpanel">
+            {createdMarkets.length === 0 ? (
               <div className="empty-state inline">
                 <h2>No creator balances</h2>
               </div>
+            ) : (
+              <div className="portfolio-table created">
+                <div className="portfolio-table-row table-head">
+                  <span>Market</span>
+                  <span>Earnings</span>
+                  <span>Deposit</span>
+                  <span>Status</span>
+                  <span>Action</span>
+                </div>
+                {createdMarkets.map((position) => {
+                  const creatorActions = claimActionsForPosition(position).filter((action) => action.kind === "creator" || action.kind === "bond");
+                  const enabledCreatorActions = creatorActions.filter((action) => action.enabled);
+                  return (
+                    <div className="portfolio-table-row" key={`created-${position.marketId}`}>
+                      <div className="portfolio-table-market">
+                        <strong>{position.marketQuestion}</strong>
+                        <span>{position.status === "Resolved" ? `Resolved ${position.resolution}` : position.status}</span>
+                      </div>
+                      <div className="portfolio-table-cell">
+                        <strong>{position.creatorFees}</strong>
+                      </div>
+                      <div className="portfolio-table-cell">
+                        <strong>{position.creationBond}</strong>
+                      </div>
+                      <span className="status">{enabledCreatorActions.length > 0 ? "Ready to claim" : "Waiting"}</span>
+                      <div className="portfolio-table-actions">
+                        {enabledCreatorActions.map((action) => (
+                          <button
+                            key={`${action.kind}-${action.marketId}`}
+                            disabled={!isWalletReady || actionPhase === "pending"}
+                            onClick={() => executeClaimAction(action)}
+                          >
+                            {action.kind === "creator" ? "Claim earnings" : "Claim deposit"}
+                          </button>
+                        ))}
+                        <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                          View market
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-            {createdMarkets.map((position) => {
-              const creatorActions = claimActionsForPosition(position).filter((action) => action.kind === "creator" || action.kind === "bond");
-              return (
-                <article className="portfolio-position-card" key={`created-${position.marketId}`}>
-                  <div className="portfolio-position-top">
-                    <div>
-                      <h3>{position.marketQuestion}</h3>
-                      <p>{position.status === "Resolved" ? `Resolved ${position.resolution}` : position.status}</p>
-                    </div>
-                    <span className="status">{creatorActions.some((action) => action.enabled) ? "Ready to claim" : "Waiting for result"}</span>
-                  </div>
-                  <dl className="portfolio-mini-list">
-                    <div>
-                      <dt>Creator earnings</dt>
-                      <dd>{position.creatorFees}</dd>
-                    </div>
-                    <div>
-                      <dt>Safety deposit</dt>
-                      <dd>{position.creationBond}</dd>
-                    </div>
-                  </dl>
-                  <div className="portfolio-card-actions">
-                    {creatorActions.map((action) => (
-                      <button
-                        key={`${action.kind}-${action.marketId}`}
-                        disabled={!action.enabled || !isWalletReady || actionPhase === "pending"}
-                        onClick={() => executeClaimAction(action)}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                      View market
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
           </div>
-        </section>
-      </div>
+        )}
+      </section>
+
     </div>
   );
 }

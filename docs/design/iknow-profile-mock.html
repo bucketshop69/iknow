@@ -377,6 +377,124 @@
         font-size: 24px;
       }
 
+      .portfolio-tabs {
+        display: grid;
+        gap: 14px;
+      }
+
+      .profile-tab-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 6px;
+      }
+
+      .profile-tab {
+        min-height: 46px;
+        border: 0;
+        border-radius: 13px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 900;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .profile-tab span {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 7px;
+        font-size: 12px;
+      }
+
+      .profile-tab.active {
+        background: var(--ink);
+        color: var(--import-text);
+        box-shadow: var(--shadow);
+      }
+
+      .profile-tab-panel {
+        display: none;
+      }
+
+      .profile-tab-panel.active {
+        display: block;
+      }
+
+      .profile-table {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--card-2);
+      }
+
+      .profile-table-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 56px 88px 110px 112px;
+        gap: 8px;
+        align-items: center;
+        padding: 10px;
+        border-top: 1px solid var(--line);
+      }
+
+      .profile-tab-panel[data-panel="funding"] .profile-table-row {
+        grid-template-columns: minmax(0, 1fr) 96px 112px 96px 112px;
+      }
+
+      .profile-tab-panel[data-panel="created"] .profile-table-row {
+        grid-template-columns: minmax(0, 1fr) 86px 80px 96px 112px;
+      }
+
+      .profile-table-row > * {
+        min-width: 0;
+      }
+
+      .profile-table-row:first-child {
+        border-top: 0;
+      }
+
+      .profile-table-row.table-head {
+        background: var(--card);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .profile-market strong,
+      .profile-cell strong {
+        display: block;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+
+      .profile-market span,
+      .profile-cell span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .profile-table .secondary {
+        min-height: 38px;
+        padding: 0 8px;
+        border-radius: 13px;
+        font-size: 14px;
+        white-space: nowrap;
+        width: 100%;
+      }
+
       .call-list,
       .created-list,
       .activity-list {
@@ -584,6 +702,23 @@
         .created-meta {
           grid-template-columns: 1fr;
         }
+
+        .profile-tab-list {
+          grid-template-columns: 1fr;
+        }
+
+        .profile-table-row,
+        .profile-table-row.table-head {
+          grid-template-columns: 1fr;
+        }
+
+        .profile-table-row.table-head {
+          display: none;
+        }
+
+        .profile-table .secondary {
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -642,81 +777,161 @@
 
         <section class="layout">
           <div>
-            <section class="section">
+            <section class="section portfolio-tabs">
               <div class="section-head">
                 <div>
-                  <h2>Your calls</h2>
-                  <span>Everything you picked, waiting or won.</span>
+                  <h2>Your profile</h2>
+                  <span>Calls, funding, and markets you created in one table.</span>
                 </div>
               </div>
-              <div class="call-list">
-                <article class="call-card">
-                  <div class="call-top">
-                    <div>
-                      <h3>Will CSK beat SRH in their next IPL match?</h3>
-                      <p>You picked Yes · 100 USDC</p>
+
+              <div class="profile-tab-list" role="tablist" aria-label="Profile sections">
+                <button class="profile-tab active" type="button" role="tab" aria-selected="true" data-panel="calls">
+                  Your calls <span>3</span>
+                </button>
+                <button class="profile-tab" type="button" role="tab" aria-selected="false" data-panel="funding">
+                  Funding <span>2</span>
+                </button>
+                <button class="profile-tab" type="button" role="tab" aria-selected="false" data-panel="created">
+                  Created <span>2</span>
+                </button>
+              </div>
+
+              <div class="profile-tab-panel active" role="tabpanel" data-panel="calls">
+                <div class="profile-table">
+                  <div class="profile-table-row table-head">
+                    <span>Market</span>
+                    <span>Pick</span>
+                    <span>Position</span>
+                    <span>Status</span>
+                    <span>Action</span>
+                  </div>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will CSK beat SRH in their next IPL match?</strong>
+                      <span>Joined today</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>YES</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>100 USDC</strong>
+                      <span>stake</span>
                     </div>
                     <span class="pill yes">Ready to claim</span>
+                    <button class="secondary">Claim</button>
                   </div>
-                  <div class="call-actions">
-                    <button class="primary">Claim 156.42 USDC</button>
-                    <button class="secondary">View receipts</button>
-                  </div>
-                </article>
-
-                <article class="call-card">
-                  <div class="call-top">
-                    <div>
-                      <h3>Will BTC close above $110k on Friday?</h3>
-                      <p>You picked No · 50 USDC</p>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will BTC close above $110k on Friday?</strong>
+                      <span>Market still open</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>NO</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>50 USDC</strong>
+                      <span>stake</span>
                     </div>
                     <span class="pill">Live</span>
-                  </div>
-                  <div class="call-actions">
                     <button class="secondary">View market</button>
                   </div>
-                </article>
-
-                <article class="call-card">
-                  <div class="call-top">
-                    <div>
-                      <h3>Will the Arc smoke market resolve YES?</h3>
-                      <p>You picked Yes · receipts posted</p>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will the Arc smoke market resolve YES?</strong>
+                      <span>Receipts posted</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>YES</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>0.20 USDC</strong>
+                      <span>winnings</span>
                     </div>
                     <span class="pill yes">Claimed</span>
+                    <button class="secondary">Receipts</button>
                   </div>
-                  <div class="call-actions">
-                    <button class="secondary">View receipts</button>
-                  </div>
-                </article>
-              </div>
-            </section>
-
-            <section class="section">
-              <div class="section-head">
-                <div>
-                  <h2>Markets you created</h2>
-                  <span>Calls you started for other people to join.</span>
                 </div>
               </div>
-              <div class="created-list">
-                <article class="created-card">
-                  <div>
-                    <h3>Will Arsenal beat Chelsea in their next league match?</h3>
-                    <p>Agents are checking the details when this ends.</p>
+
+              <div class="profile-tab-panel" role="tabpanel" data-panel="funding">
+                <div class="profile-table">
+                  <div class="profile-table-row table-head">
+                    <span>Market</span>
+                    <span>Funded</span>
+                    <span>Fees earned</span>
+                    <span>Status</span>
+                    <span>Action</span>
                   </div>
-                  <div class="created-meta">
-                    <div class="mini-stat">
-                      <span>People joined</span>
-                      <strong>42</strong>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will Uzbekistan win the 2026 FIFA World Cup?</strong>
+                      <span>Liquidity provider</span>
                     </div>
-                    <div class="mini-stat">
-                      <span>You earned</span>
-                      <strong>18.40 USDC</strong>
+                    <div class="profile-cell">
+                      <strong>10 LP</strong>
                     </div>
+                    <div class="profile-cell">
+                      <strong>0 USDC</strong>
+                    </div>
+                    <span class="pill">Open</span>
+                    <button class="secondary">Remove</button>
                   </div>
-                  <button class="secondary">View market</button>
-                </article>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will Bitcoin hit $150k by June 30, 2026?</strong>
+                      <span>Liquidity provider</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>19.465445 LP</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>0.011999 USDC</strong>
+                    </div>
+                    <span class="pill">Open</span>
+                    <button class="secondary">Remove</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="profile-tab-panel" role="tabpanel" data-panel="created">
+                <div class="profile-table">
+                  <div class="profile-table-row table-head">
+                    <span>Market</span>
+                    <span>Earnings</span>
+                    <span>Deposit</span>
+                    <span>Status</span>
+                    <span>Action</span>
+                  </div>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will Uzbekistan win the 2026 FIFA World Cup?</strong>
+                      <span>Open</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>0 USDC</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>5 USDC</strong>
+                    </div>
+                    <span class="pill">Waiting</span>
+                    <button class="secondary">View market</button>
+                  </div>
+                  <div class="profile-table-row">
+                    <div class="profile-market">
+                      <strong>Will Bitcoin hit $150k by June 30, 2026?</strong>
+                      <span>Open</span>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>0.003 USDC</strong>
+                    </div>
+                    <div class="profile-cell">
+                      <strong>5 USDC</strong>
+                    </div>
+                    <span class="pill">Waiting</span>
+                    <button class="secondary">View market</button>
+                  </div>
+                </div>
               </div>
             </section>
           </div>
@@ -780,6 +995,25 @@
       applyTheme(savedTheme || "light");
       toggle.addEventListener("click", () => {
         applyTheme(root.dataset.theme === "dark" ? "light" : "dark");
+      });
+
+      const profileTabs = document.querySelectorAll(".profile-tab");
+      const profilePanels = document.querySelectorAll(".profile-tab-panel");
+
+      profileTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const target = tab.dataset.panel;
+
+          profileTabs.forEach((item) => {
+            const isActive = item === tab;
+            item.classList.toggle("active", isActive);
+            item.setAttribute("aria-selected", String(isActive));
+          });
+
+          profilePanels.forEach((panel) => {
+            panel.classList.toggle("active", panel.dataset.panel === target);
+          });
+        });
       });
     </script>
   </body>
