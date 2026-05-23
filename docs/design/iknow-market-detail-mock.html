@@ -221,9 +221,10 @@
         align-items: start;
       }
 
-      .market-main {
-        display: grid;
-        gap: 18px;
+      .workspace > .hero,
+      .workspace > .price-grid,
+      .workspace > .section {
+        grid-column: 1;
       }
 
       .hero,
@@ -447,6 +448,9 @@
       }
 
       .ticket {
+        grid-column: 2;
+        grid-row: 1 / span 6;
+        min-width: 0;
         position: sticky;
         top: 18px;
         overflow: hidden;
@@ -482,10 +486,12 @@
         background: var(--card-2);
         border: 1px solid var(--line);
         border-radius: 18px;
+        min-width: 0;
       }
 
       .mode-tabs button {
         min-height: 38px;
+        min-width: 0;
         border: 0;
         border-radius: 13px;
         background: transparent;
@@ -504,11 +510,13 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
         margin-bottom: 14px;
+        min-width: 0;
       }
 
       .side-buttons button {
         border: 1px solid var(--line);
         border-radius: 18px;
+        min-width: 0;
         min-height: 52px;
         background: var(--card-2);
         color: var(--muted);
@@ -569,6 +577,34 @@
       .provider-panel {
         display: grid;
         gap: 14px;
+      }
+
+      .trade-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        padding: 5px;
+        margin-bottom: 14px;
+        background: var(--card-2);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        min-width: 0;
+      }
+
+      .trade-switch button {
+        min-height: 36px;
+        min-width: 0;
+        border: 0;
+        border-radius: 13px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .trade-switch button.active {
+        background: var(--ink);
+        color: var(--nav-active-text);
       }
 
       .action-panel[hidden] {
@@ -634,6 +670,98 @@
         line-height: 1.45;
       }
 
+      .market-position {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+        padding-top: 16px;
+      }
+
+      .market-position h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .market-position p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .position-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .position-grid .metric {
+        background: var(--card-2);
+      }
+
+      .tool-details {
+        background: var(--card-2);
+      }
+
+      .tool-details summary {
+        cursor: pointer;
+        font-size: 20px;
+        font-weight: 900;
+      }
+
+      .tool-details summary span {
+        display: block;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        margin-top: 4px;
+      }
+
+      .tool-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .tool-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+      }
+
+      .tool-card strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .tool-card dl {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+      }
+
+      .tool-card div {
+        display: grid;
+        gap: 3px;
+      }
+
+      .tool-card dt {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .tool-card dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
       .primary,
       .secondary {
         min-height: 46px;
@@ -678,8 +806,17 @@
         .workspace,
         .explainer,
         .money-card,
-        .receipt-grid {
+        .receipt-grid,
+        .tool-grid {
           grid-template-columns: 1fr;
+        }
+
+        .workspace > .hero,
+        .workspace > .price-grid,
+        .workspace > .section,
+        .ticket {
+          grid-column: 1;
+          grid-row: auto;
         }
 
         .money-stats {
@@ -741,146 +878,84 @@
 
       <main class="main">
         <section class="workspace">
-          <div class="market-main">
-            <section class="hero">
-              <div class="meta-row">
-                <span class="pill">Sports</span>
-                <span class="pill">Live</span>
-                <span class="pill">Closes tonight</span>
-              </div>
-              <p class="kicker">Market detail</p>
-              <h1>Will Chennai Super Kings beat Sunrisers Hyderabad in their next IPL match?</h1>
-              <p>Official scorecard decides it. If the match is abandoned, nobody pretends.</p>
-            </section>
-
-            <div class="price-grid">
-              <div class="price-card yes">
-                <span>Yes</span>
-                <strong>62¢</strong>
-              </div>
-              <div class="price-card no">
-                <span>No</span>
-                <strong>38¢</strong>
-              </div>
+          <section class="hero">
+            <div class="meta-row">
+              <span class="pill">Sports</span>
+              <span class="pill">Live</span>
+              <span class="pill">Closes tonight</span>
             </div>
+            <p class="kicker">Market detail</p>
+            <h1>Will Chennai Super Kings beat Sunrisers Hyderabad in their next IPL match?</h1>
+            <p>Official scorecard decides it. If the match is abandoned, nobody pretends.</p>
+          </section>
 
-            <section class="section">
-              <div class="section-head">
-                <div>
-                  <h2>What this means</h2>
-                  <span>Plain rules before anyone joins.</span>
-                </div>
-              </div>
-              <div class="explainer">
-                <div class="explainer-card">
-                  <strong>Yes wins if</strong>
-                  <p>CSK is listed as the winner in the final scorecard.</p>
-                </div>
-                <div class="explainer-card">
-                  <strong>No wins if</strong>
-                  <p>SRH wins or CSK is not the listed winner.</p>
-                </div>
-                <div class="explainer-card">
-                  <strong>Doesn’t count if</strong>
-                  <p>The match is abandoned or no final result appears.</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="section">
-              <div class="section-head">
-                <div>
-                  <h2>Market money</h2>
-                  <span>The money people provide helps others join either side.</span>
-                </div>
-              </div>
-              <div class="money-card">
-                <div>
-                  <strong>Providers earn when people trade on this market.</strong>
-                  <p>Your final amount can move up or down before the result, because the market keeps balancing Yes and No.</p>
-                </div>
-                <div class="money-stats">
-                  <div class="money-stat">
-                    <span>Provided</span>
-                    <strong>420 USDC</strong>
-                  </div>
-                  <div class="money-stat">
-                    <span>Fees earned</span>
-                    <strong>8.4 USDC</strong>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section class="section receipt-section">
-              <div class="section-head">
-                <div>
-                  <h2>Receipts</h2>
-                  <span>Will appear here when the market ends.</span>
-                </div>
-              </div>
-              <div class="receipt-grid">
-                <div class="receipt-card">
-                  <strong>Agents will check</strong>
-                  <p>Final scorecard, team names, match status, and invalid cases.</p>
-                </div>
-                <div class="receipt-card">
-                  <strong>Before anyone claims</strong>
-                  <p>iknow agents mark the result as Yes, No, or Invalid.</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="section">
-              <div class="section-head">
-                <div>
-                  <h2>Activity</h2>
-                  <span>What people are doing on this market.</span>
-                </div>
-              </div>
-              <div class="activity-list">
-                <div class="activity-card">
-                  <div>
-                    <strong>128 people joined</strong>
-                    <p>Most recent call: Yes</p>
-                  </div>
-                  <span class="pill">Just now</span>
-                </div>
-                <div class="activity-card">
-                  <div>
-                    <strong>Price moved toward Yes</strong>
-                    <p>Yes moved from 58¢ to 62¢ today.</p>
-                  </div>
-                  <span class="pill">Today</span>
-                </div>
-              </div>
-            </section>
+          <div class="price-grid">
+            <div class="price-card yes">
+              <span>Yes</span>
+              <strong>62¢</strong>
+            </div>
+            <div class="price-card no">
+              <span>No</span>
+              <strong>38¢</strong>
+            </div>
           </div>
 
           <aside class="ticket">
             <div class="ticket-head">
               <span>Market actions</span>
-              <h2>Join or provide money</h2>
+              <h2>Bet or fund market</h2>
             </div>
             <div class="ticket-body">
               <div class="mode-tabs" aria-label="Market action">
-                <button type="button" data-action-tab="call">Make a call</button>
-                <button type="button" class="active" data-action-tab="provide">Provide money</button>
+                <button type="button" class="active" data-action-tab="call">Bet</button>
+                <button type="button" data-action-tab="provide">Fund market</button>
               </div>
-              <div class="provider-panel action-panel" data-action-panel="provide">
-                <p class="provider-intro">Help this market stay easy to join. You earn a share of fees when people trade.</p>
+
+              <div class="action-panel" data-action-panel="call">
+                <div class="side-buttons">
+                  <button class="active">Yes</button>
+                  <button>No</button>
+                </div>
+                <div class="trade-switch" aria-label="Trade mode">
+                  <button class="active">Buy</button>
+                  <button>Sell</button>
+                </div>
                 <div class="amount">
-                  <label for="provide-amount">How much do you want to provide?</label>
+                  <label for="amount">You pay</label>
+                  <input id="amount" value="100" />
+                </div>
+                <div class="quote">
+                  <div>
+                    <span>You get about</span>
+                    <strong>156.42 Yes</strong>
+                  </div>
+                  <div>
+                    <span>If Yes wins</span>
+                    <strong>156.42 USDC</strong>
+                  </div>
+                  <div>
+                    <span>Fee</span>
+                    <strong>0.30 USDC</strong>
+                  </div>
+                </div>
+                <button class="primary">Buy Yes</button>
+                <p class="helper">Winners claim after receipts are posted and the result is final.</p>
+              </div>
+
+              <div class="provider-panel action-panel" data-action-panel="provide" hidden>
+                <p class="provider-intro">Put USDC into this market so other people can buy Yes or No. You earn a share of fees when people trade.</p>
+                <div class="amount">
+                  <label for="provide-amount">Money to provide</label>
                   <input id="provide-amount" value="250" />
                 </div>
                 <div class="provider-metrics">
                   <div class="metric">
-                    <span>Your share</span>
+                    <span>Pool share</span>
                     <strong>36.8%</strong>
                   </div>
                   <div class="metric">
-                    <span>Fee share</span>
-                    <strong>36.8%</strong>
+                    <span>Fees earned</span>
+                    <strong>0.42 USDC</strong>
                   </div>
                 </div>
                 <div class="provider-card">
@@ -890,40 +965,166 @@
                 <div class="risk-note">
                   Your final amount may change before the result. After the market resolves, you can withdraw your remaining money and fees.
                 </div>
-                <button class="primary">Provide money</button>
+                <button class="primary">Fund market</button>
                 <div class="panel-actions">
                   <button class="secondary">Add more</button>
                   <button class="secondary">Remove money</button>
                 </div>
               </div>
-              <div class="action-panel" data-action-panel="call" hidden>
-                <div class="side-buttons">
-                  <button class="active">Yes</button>
-                  <button>No</button>
+
+              <div class="market-position">
+                <div>
+                  <h3>Your position in this market</h3>
+                  <p>Profile shows everything. This shows only what you have here.</p>
                 </div>
-                <div class="amount">
-                  <label for="amount">Amount</label>
-                  <input id="amount" value="100" />
+                <div class="position-grid">
+                  <div class="metric">
+                    <span>Yes owned</span>
+                    <strong>24.1</strong>
+                  </div>
+                  <div class="metric">
+                    <span>No owned</span>
+                    <strong>0</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Funded</span>
+                    <strong>25 USDC</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Fees earned</span>
+                    <strong>0.42 USDC</strong>
+                  </div>
                 </div>
-                <div class="quote">
-                  <div>
-                    <span>You’ll get about</span>
-                    <strong>156.42 Yes</strong>
-                  </div>
-                  <div>
-                    <span>If you’re right</span>
-                    <strong>156.42 USDC</strong>
-                  </div>
-                  <div>
-                    <span>Fee</span>
-                    <strong>0.30 USDC</strong>
-                  </div>
-                </div>
-                <button class="primary">Join Yes</button>
-                <p class="helper">If you called it right, claim after receipts are posted and the result is in.</p>
               </div>
             </div>
           </aside>
+
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>What this means</h2>
+                <span>Plain rules before anyone joins.</span>
+              </div>
+            </div>
+            <div class="explainer">
+              <div class="explainer-card">
+                <strong>Yes wins if</strong>
+                <p>CSK is listed as the winner in the final scorecard.</p>
+              </div>
+              <div class="explainer-card">
+                <strong>No wins if</strong>
+                <p>SRH wins or CSK is not the listed winner.</p>
+              </div>
+              <div class="explainer-card">
+                <strong>Invalid if</strong>
+                <p>The match is abandoned or no final result appears.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Market money</h2>
+                <span>The pool lets people join either side without waiting for another trader.</span>
+              </div>
+            </div>
+            <div class="money-card">
+              <div>
+                <strong>Liquidity providers earn fees, but they take market-making risk.</strong>
+                <p>Provided money can move up or down before the result because the AMM keeps balancing Yes and No.</p>
+              </div>
+              <div class="money-stats">
+                <div class="money-stat">
+                  <span>Liquidity</span>
+                  <strong>420 USDC</strong>
+                </div>
+                <div class="money-stat">
+                  <span>24h volume</span>
+                  <strong>1.2k USDC</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section receipt-section">
+            <div class="section-head">
+              <div>
+                <h2>Receipts</h2>
+                <span>Evidence and reasoning appear here near settlement.</span>
+              </div>
+            </div>
+            <div class="receipt-grid">
+              <div class="receipt-card">
+                <strong>Source to check</strong>
+                <p>Official IPL scorecard, with team names and match status verified.</p>
+              </div>
+              <div class="receipt-card">
+                <strong>Agent recommendation</strong>
+                <p>Agent prepares Yes, No, or Invalid with links. Resolver still finalizes.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Activity</h2>
+                <span>Market movement without exposing protocol machinery.</span>
+              </div>
+            </div>
+            <div class="activity-list">
+              <div class="activity-card">
+                <div>
+                  <strong>128 people joined</strong>
+                  <p>Most recent trade: Buy Yes</p>
+                </div>
+                <span class="pill">Just now</span>
+              </div>
+              <div class="activity-card">
+                <div>
+                  <strong>Price moved toward Yes</strong>
+                  <p>Yes moved from 58¢ to 62¢ today.</p>
+                </div>
+                <span class="pill">Today</span>
+              </div>
+            </div>
+          </section>
+
+          <details class="section tool-details">
+            <summary>
+              Resolver tools and technical record
+              <span>Hidden by default so traders and LPs do not have to parse admin controls.</span>
+            </summary>
+            <div class="tool-grid">
+              <div class="tool-card">
+                <strong>Resolver actions</strong>
+                <div class="panel-actions">
+                  <button class="secondary">Prepare packet</button>
+                  <button class="secondary">Propose result</button>
+                  <button class="secondary">Finalize</button>
+                  <button class="secondary">Redeem</button>
+                </div>
+              </div>
+              <div class="tool-card">
+                <strong>Market record</strong>
+                <dl>
+                  <div>
+                    <dt>Market address</dt>
+                    <dd>0xB30d...Aa0D</dd>
+                  </div>
+                  <div>
+                    <dt>Spec hash</dt>
+                    <dd>0xb4b7...e535</dd>
+                  </div>
+                  <div>
+                    <dt>Metadata URI</dt>
+                    <dd>urn:iknow:market:b4b7b3d8</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </details>
         </section>
       </main>
     </div>
