@@ -862,13 +862,13 @@
           </div>
           <div class="brand-copy">
             <strong>iknow</strong>
-            <span>calls with receipts</span>
+            <span>markets with receipts</span>
           </div>
         </div>
         <nav class="nav" aria-label="Main navigation">
-          <button class="active">Home</button>
+          <button class="active">Markets</button>
           <button>Create</button>
-          <button>Profile</button>
+          <button>Portfolio</button>
         </nav>
         <div class="actions">
           <button class="theme-toggle" type="button" aria-label="Toggle color mode">Dark mode</button>
@@ -882,20 +882,20 @@
             <div class="meta-row">
               <span class="pill">Sports</span>
               <span class="pill">Live</span>
-              <span class="pill">Closes tonight</span>
+              <span class="pill">Creator-seeded AMM</span>
             </div>
-            <p class="kicker">Market detail</p>
+            <p class="kicker">Wallet-native market</p>
             <h1>Will Chennai Super Kings beat Sunrisers Hyderabad in their next IPL match?</h1>
-            <p>Official scorecard decides it. If the match is abandoned, nobody pretends.</p>
+            <p>Official scorecard decides it. If the match is abandoned or cannot be judged cleanly, the INVALID path exists for a reason.</p>
           </section>
 
           <div class="price-grid">
             <div class="price-card yes">
-              <span>Yes</span>
+              <span>YES</span>
               <strong>62¢</strong>
             </div>
             <div class="price-card no">
-              <span>No</span>
+              <span>NO</span>
               <strong>38¢</strong>
             </div>
           </div>
@@ -903,18 +903,18 @@
           <aside class="ticket">
             <div class="ticket-head">
               <span>Market actions</span>
-              <h2>Bet or fund market</h2>
+              <h2>Trade or fund AMM</h2>
             </div>
             <div class="ticket-body">
               <div class="mode-tabs" aria-label="Market action">
-                <button type="button" class="active" data-action-tab="call">Bet</button>
-                <button type="button" data-action-tab="provide">Fund market</button>
+                <button type="button" class="active" data-action-tab="call">Trade</button>
+                <button type="button" data-action-tab="provide">Provide liquidity</button>
               </div>
 
               <div class="action-panel" data-action-panel="call">
                 <div class="side-buttons">
-                  <button class="active">Yes</button>
-                  <button>No</button>
+                  <button class="active">YES</button>
+                  <button>NO</button>
                 </div>
                 <div class="trade-switch" aria-label="Trade mode">
                   <button class="active">Buy</button>
@@ -927,25 +927,29 @@
                 <div class="quote">
                   <div>
                     <span>You get about</span>
-                    <strong>156.42 Yes</strong>
+                    <strong>156.42 YES</strong>
                   </div>
                   <div>
-                    <span>If Yes wins</span>
+                    <span>If YES wins</span>
                     <strong>156.42 USDC</strong>
                   </div>
                   <div>
                     <span>Fee</span>
                     <strong>0.30 USDC</strong>
                   </div>
+                  <div>
+                    <span>Gas</span>
+                    <strong>Sponsored path</strong>
+                  </div>
                 </div>
-                <button class="primary">Buy Yes</button>
-                <p class="helper">Winners claim after receipts are posted and the result is final.</p>
+                <button class="primary">Buy YES</button>
+                <p class="helper">Wallet USDC in, YES exposure out. No vault deposit before the trade.</p>
               </div>
 
               <div class="provider-panel action-panel" data-action-panel="provide" hidden>
-                <p class="provider-intro">Put USDC into this market so other people can buy Yes or No. You earn a share of fees when people trade.</p>
+                <p class="provider-intro">Put USDC-backed liquidity into this AMM so other people can buy YES or NO. You earn a share of fees and take market-making risk.</p>
                 <div class="amount">
-                  <label for="provide-amount">Money to provide</label>
+                  <label for="provide-amount">USDC to provide</label>
                   <input id="provide-amount" value="250" />
                 </div>
                 <div class="provider-metrics">
@@ -963,27 +967,27 @@
                   <p>Fees earned so far: 0.42 USDC</p>
                 </div>
                 <div class="risk-note">
-                  Your final amount may change before the result. After the market resolves, you can withdraw your remaining money and fees.
+                  LPs are not earning fixed yield. Your final amount can move with price, volume, and resolution. After settlement, withdraw remaining USDC and fees.
                 </div>
-                <button class="primary">Fund market</button>
+                <button class="primary">Provide liquidity</button>
                 <div class="panel-actions">
                   <button class="secondary">Add more</button>
-                  <button class="secondary">Remove money</button>
+                  <button class="secondary">Remove liquidity</button>
                 </div>
               </div>
 
               <div class="market-position">
                 <div>
                   <h3>Your position in this market</h3>
-                  <p>Profile shows everything. This shows only what you have here.</p>
+                  <p>Wallet-held positions and LP shares for this market only.</p>
                 </div>
                 <div class="position-grid">
                   <div class="metric">
-                    <span>Yes owned</span>
+                    <span>YES owned</span>
                     <strong>24.1</strong>
                   </div>
                   <div class="metric">
-                    <span>No owned</span>
+                    <span>NO owned</span>
                     <strong>0</strong>
                   </div>
                   <div class="metric">
@@ -1002,21 +1006,21 @@
           <section class="section">
             <div class="section-head">
               <div>
-                <h2>What this means</h2>
-                <span>Plain rules before anyone joins.</span>
+                <h2>Settlement rules</h2>
+                <span>Plain YES, NO, and INVALID paths before anyone joins.</span>
               </div>
             </div>
             <div class="explainer">
               <div class="explainer-card">
-                <strong>Yes wins if</strong>
+                <strong>YES wins if</strong>
                 <p>CSK is listed as the winner in the final scorecard.</p>
               </div>
               <div class="explainer-card">
-                <strong>No wins if</strong>
+                <strong>NO wins if</strong>
                 <p>SRH wins or CSK is not the listed winner.</p>
               </div>
               <div class="explainer-card">
-                <strong>Invalid if</strong>
+                <strong>INVALID if</strong>
                 <p>The match is abandoned or no final result appears.</p>
               </div>
             </div>
@@ -1025,14 +1029,14 @@
           <section class="section">
             <div class="section-head">
               <div>
-                <h2>Market money</h2>
-                <span>The pool lets people join either side without waiting for another trader.</span>
+                <h2>Creator-seeded AMM</h2>
+                <span>The pool lets people trade either side without waiting for another trader.</span>
               </div>
             </div>
             <div class="money-card">
               <div>
-                <strong>Liquidity providers earn fees, but they take market-making risk.</strong>
-                <p>Provided money can move up or down before the result because the AMM keeps balancing Yes and No.</p>
+                <strong>Liquidity providers earn fees, but they take real inventory risk.</strong>
+                <p>USDC liquidity backs complete YES/NO sets. The AMM keeps balancing the sides while traders move the price.</p>
               </div>
               <div class="money-stats">
                 <div class="money-stat">
@@ -1050,8 +1054,8 @@
           <section class="section receipt-section">
             <div class="section-head">
               <div>
-                <h2>Receipts</h2>
-                <span>Evidence and reasoning appear here near settlement.</span>
+                <h2>Evidence packet</h2>
+                <span>YES, NO, or INVALID with sources before settlement finalizes.</span>
               </div>
             </div>
             <div class="receipt-grid">
@@ -1061,7 +1065,15 @@
               </div>
               <div class="receipt-card">
                 <strong>Agent recommendation</strong>
-                <p>Agent prepares Yes, No, or Invalid with links. Resolver still finalizes.</p>
+                <p>Agent prepares YES, NO, or INVALID with links. Resolver still finalizes.</p>
+              </div>
+              <div class="receipt-card">
+                <strong>Invalid checks</strong>
+                <p>Abandoned match, wrong teams, missing final score, and source availability.</p>
+              </div>
+              <div class="receipt-card">
+                <strong>Challengeable result</strong>
+                <p>AI recommends. Market rules govern. The authorized resolution flow decides.</p>
               </div>
             </div>
           </section>
@@ -1070,21 +1082,21 @@
             <div class="section-head">
               <div>
                 <h2>Activity</h2>
-                <span>Market movement without exposing protocol machinery.</span>
+                <span>Trades, liquidity, and receipts without vault accounting.</span>
               </div>
             </div>
             <div class="activity-list">
               <div class="activity-card">
                 <div>
-                  <strong>128 people joined</strong>
-                  <p>Most recent trade: Buy Yes</p>
+                  <strong>128 wallet trades</strong>
+                  <p>Most recent trade: Buy YES with USDC</p>
                 </div>
                 <span class="pill">Just now</span>
               </div>
               <div class="activity-card">
                 <div>
-                  <strong>Price moved toward Yes</strong>
-                  <p>Yes moved from 58¢ to 62¢ today.</p>
+                  <strong>Price moved toward YES</strong>
+                  <p>YES moved from 58¢ to 62¢ today.</p>
                 </div>
                 <span class="pill">Today</span>
               </div>

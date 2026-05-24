@@ -732,13 +732,13 @@
           </div>
           <div class="brand-copy">
             <strong>iknow</strong>
-            <span>calls with receipts</span>
+            <span>markets with receipts</span>
           </div>
         </div>
         <nav class="nav" aria-label="Main navigation">
-          <button>Home</button>
+          <button>Markets</button>
           <button>Create</button>
-          <button class="active">Profile</button>
+          <button class="active">Portfolio</button>
         </nav>
         <div class="actions">
           <button class="theme-toggle" type="button" aria-label="Toggle color mode">Dark mode</button>
@@ -756,12 +756,12 @@
             <div>
               <p class="kicker">Your iknow</p>
               <h1>Amrita knows.</h1>
-              <p>0xc9BE...51CF · making calls on Arc Testnet</p>
+              <p>0xc9BE...51CF · wallet-native USDC positions on Arc Testnet</p>
             </div>
           </div>
           <div class="stats">
             <div class="stat">
-              <span>Markets joined</span>
+              <span>Markets traded</span>
               <strong>8</strong>
             </div>
             <div class="stat">
@@ -780,17 +780,17 @@
             <section class="section portfolio-tabs">
               <div class="section-head">
                 <div>
-                  <h2>Your profile</h2>
-                  <span>Calls, funding, and markets you created in one table.</span>
+                  <h2>Your portfolio</h2>
+                  <span>Wallet positions, liquidity, creator deposits, and receipts in one place.</span>
                 </div>
               </div>
 
               <div class="profile-tab-list" role="tablist" aria-label="Profile sections">
                 <button class="profile-tab active" type="button" role="tab" aria-selected="true" data-panel="calls">
-                  Your calls <span>3</span>
+                  Positions <span>3</span>
                 </button>
                 <button class="profile-tab" type="button" role="tab" aria-selected="false" data-panel="funding">
-                  Funding <span>2</span>
+                  Liquidity <span>2</span>
                 </button>
                 <button class="profile-tab" type="button" role="tab" aria-selected="false" data-panel="created">
                   Created <span>2</span>
@@ -801,7 +801,7 @@
                 <div class="profile-table">
                   <div class="profile-table-row table-head">
                     <span>Market</span>
-                    <span>Pick</span>
+                    <span>Side</span>
                     <span>Position</span>
                     <span>Status</span>
                     <span>Action</span>
@@ -816,9 +816,9 @@
                     </div>
                     <div class="profile-cell">
                       <strong>100 USDC</strong>
-                      <span>stake</span>
+                      <span>max payout</span>
                     </div>
-                    <span class="pill yes">Ready to claim</span>
+                    <span class="pill yes">USDC claimable</span>
                     <button class="secondary">Claim</button>
                   </div>
                   <div class="profile-table-row">
@@ -831,7 +831,7 @@
                     </div>
                     <div class="profile-cell">
                       <strong>50 USDC</strong>
-                      <span>stake</span>
+                      <span>exposure</span>
                     </div>
                     <span class="pill">Live</span>
                     <button class="secondary">View market</button>
@@ -858,7 +858,7 @@
                 <div class="profile-table">
                   <div class="profile-table-row table-head">
                     <span>Market</span>
-                    <span>Funded</span>
+                    <span>LP shares</span>
                     <span>Fees earned</span>
                     <span>Status</span>
                     <span>Action</span>
@@ -866,7 +866,7 @@
                   <div class="profile-table-row">
                     <div class="profile-market">
                       <strong>Will Uzbekistan win the 2026 FIFA World Cup?</strong>
-                      <span>Liquidity provider</span>
+                      <span>USDC-backed AMM liquidity</span>
                     </div>
                     <div class="profile-cell">
                       <strong>10 LP</strong>
@@ -880,7 +880,7 @@
                   <div class="profile-table-row">
                     <div class="profile-market">
                       <strong>Will Bitcoin hit $150k by June 30, 2026?</strong>
-                      <span>Liquidity provider</span>
+                      <span>USDC-backed AMM liquidity</span>
                     </div>
                     <div class="profile-cell">
                       <strong>19.465445 LP</strong>
@@ -899,14 +899,14 @@
                   <div class="profile-table-row table-head">
                     <span>Market</span>
                     <span>Earnings</span>
-                    <span>Deposit</span>
+                    <span>Safety deposit</span>
                     <span>Status</span>
                     <span>Action</span>
                   </div>
                   <div class="profile-table-row">
                     <div class="profile-market">
                       <strong>Will Uzbekistan win the 2026 FIFA World Cup?</strong>
-                      <span>Open</span>
+                      <span>Creator-seeded market</span>
                     </div>
                     <div class="profile-cell">
                       <strong>0 USDC</strong>
@@ -920,7 +920,7 @@
                   <div class="profile-table-row">
                     <div class="profile-market">
                       <strong>Will Bitcoin hit $150k by June 30, 2026?</strong>
-                      <span>Open</span>
+                      <span>Creator-seeded market</span>
                     </div>
                     <div class="profile-cell">
                       <strong>0.003 USDC</strong>
@@ -938,9 +938,9 @@
 
           <aside>
             <section class="claim-card">
-              <span>You called it.</span>
+              <span>Receipts posted. You called it.</span>
               <h2>156.42 USDC</h2>
-              <p>CSK beat SRH. Receipts are posted and your winnings are ready.</p>
+              <p>CSK beat SRH. The evidence packet is final and your wallet can redeem.</p>
               <button class="primary">Claim now</button>
             </section>
 
@@ -950,15 +950,15 @@
                 <div class="activity-item">
                   <span class="activity-dot"></span>
                   <div>
-                    <strong>You joined Yes on CSK vs SRH</strong>
+                    <strong>You bought YES on CSK vs SRH</strong>
                     <span>Today</span>
                   </div>
                 </div>
                 <div class="activity-item">
                   <span class="activity-dot"></span>
                   <div>
-                    <strong>Receipts posted</strong>
-                    <span>CSK vs SRH</span>
+                    <strong>Evidence packet posted</strong>
+                    <span>YES recommended · CSK vs SRH</span>
                   </div>
                 </div>
                 <div class="activity-item">
@@ -971,8 +971,8 @@
                 <div class="activity-item">
                   <span class="activity-dot"></span>
                   <div>
-                    <strong>You created a market</strong>
-                    <span>Arsenal vs Chelsea</span>
+                    <strong>You seeded a market</strong>
+                    <span>Arsenal vs Chelsea · creator deposit locked</span>
                   </div>
                 </div>
               </div>

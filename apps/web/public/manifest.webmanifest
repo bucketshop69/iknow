@@ -1,0 +1,17 @@
+{
+  "name": "iknow",
+  "short_name": "iknow",
+  "description": "Arc-native prediction markets with agent-backed receipts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#1d1b18",
+  "icons": [
+    {
+      "src": "/iknow-mascot.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

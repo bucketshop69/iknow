@@ -1,6 +1,7 @@
 import type { ImportResolutionReview } from "@iknow/shared";
 
 export type Route =
+  | { screen: "landing" }
   | { screen: "markets" }
   | { screen: "market"; marketId: string }
   | { screen: "create" }

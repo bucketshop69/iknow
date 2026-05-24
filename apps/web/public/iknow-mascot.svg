@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">iknow mascot</title>
+  <desc id="desc">A smiling mug-shaped mascot used as the iknow app icon.</desc>
+  <rect width="256" height="256" rx="56" fill="#f4f1ea"/>
+  <path d="M69 55h93c27 0 49 22 49 49v48c0 28-22 50-49 50H69c-27 0-49-22-49-50v-48c0-27 22-49 49-49Z" fill="#fff8e9" stroke="#1d1b18" stroke-width="10"/>
+  <path d="M209 105h18c16 0 29 13 29 29v5c0 16-13 29-29 29h-18" fill="none" stroke="#1d1b18" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="89" cy="119" r="9" fill="#1d1b18"/>
+  <circle cx="143" cy="119" r="9" fill="#1d1b18"/>
+  <path d="M88 151c14 17 46 18 62 0" fill="none" stroke="#1d1b18" stroke-width="9" stroke-linecap="round"/>
+  <path d="M64 207h105c19 0 35-9 44-23" fill="none" stroke="#d8b85a" stroke-width="12" stroke-linecap="round" opacity=".65"/>
+</svg>

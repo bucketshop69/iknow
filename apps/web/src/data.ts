@@ -126,7 +126,7 @@ export async function loadAppDeployment(): Promise<AppDeployment | null> {
 
   const response = await fetch(`${apiBaseUrl}/testnet/deployment`);
   if (!response.ok) {
-    return fallbackArcDeployment();
+    return null;
   }
 
   return normalizeArcDeployment(await response.json());
@@ -173,7 +173,7 @@ function normalizeArcDeployment(raw: unknown): AppDeployment | null {
   const usdc = addressOrUndefined(candidate.contracts?.usdc?.address);
 
   if (!marketFactory || !outcomeToken || !usdc) {
-    return fallbackArcDeployment();
+    return null;
   }
 
   return {
@@ -210,39 +210,6 @@ function normalizeArcDeployment(raw: unknown): AppDeployment | null {
       const parsed = deployedMarketSchema.safeParse(market);
       return parsed.success ? [parsed.data] : [];
     }),
-    mode: "arc-testnet",
-  };
-}
-
-function fallbackArcDeployment(): AppDeployment | null {
-  const marketFactory = addressOrUndefined(deployedAddresses.arcTestnet.marketFactory);
-  const outcomeToken = addressOrUndefined(deployedAddresses.arcTestnet.outcomeToken);
-  if (!marketFactory || !outcomeToken) {
-    return null;
-  }
-
-  return {
-    schemaVersion: 1,
-    generatedAtBlockTimestamp: Math.floor(Date.now() / 1000),
-    chain: {
-      id: arcTestnet.id,
-      name: arcTestnet.name,
-      rpcUrl: arcTestnet.rpcUrl,
-    },
-    contracts: {
-      usdc: {
-        address: "0x3600000000000000000000000000000000000000",
-        decimals: 6,
-      },
-      outcomeToken: {
-        address: outcomeToken,
-      },
-      iknowMarketFactory: {
-        address: marketFactory,
-      },
-    },
-    actors: {},
-    markets: [],
     mode: "arc-testnet",
   };
 }
@@ -344,30 +311,9 @@ export function devActorsFromDeployment(deployment: AppDeployment | null, wallet
   }));
 }
 
-const fallbackMarkets: MarketReadModel[] = [
-  {
-    id: "local-not-loaded",
-    address: undefined,
-    question: "Start Anvil and run pnpm chain:deploy to load seeded markets",
-    status: "Open",
-    closeTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    resolutionSource: "Local deployment artifact",
-    invalidConditions: ["Local deployment artifact is missing."],
-    metadataURI: "local://missing",
-    specHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-    creator: "Creator",
-    yesPrice: 0.5,
-    noPrice: 0.5,
-    liquidity: "0 USDC",
-    yesReserve: "0 YES",
-    noReserve: "0 NO",
-    volume24h: "0 USDC",
-  },
-];
-
 export function marketsFromDeployment(deployment: AppDeployment | null): MarketReadModel[] {
   if (!deployment) {
-    return fallbackMarkets;
+    return [];
   }
 
   return deployment.markets.map((market, index) => ({
@@ -604,8 +550,8 @@ function requireDeployment(deployment: AppDeployment | null): AppDeployment {
   if (!deployment) {
     throw new Error(
       chainRuntimeMode === "arc-testnet"
-        ? "Arc testnet deployment is not loaded. Run pnpm dev:api and check contracts/deployments/arc-testnet.json."
-        : "Local deployment is not loaded. Run pnpm chain:anvil, pnpm chain:deploy, and pnpm dev:api.",
+        ? "Arc Testnet deployment is not ready yet. Wait for markets to finish loading, then try again."
+        : "Local deployment is not ready yet. Wait for markets to finish loading, then try again.",
     );
   }
 

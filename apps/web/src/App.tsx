@@ -24,7 +24,6 @@ import { iknowTheme } from "./tokens";
 import { arcTestnetChain } from "./wagmi";
 import type {
   CreateDraftInput,
-  DevActor,
   EvidenceBriefReadModel,
   EvidenceInvalidCheckReadModel,
   MarketLifecycleReadback,
@@ -38,6 +37,14 @@ import type {
 
 const initialRoute = (): Route => {
   const path = window.location.pathname;
+
+  if (path === "/") {
+    return { screen: "landing" };
+  }
+
+  if (path === "/markets") {
+    return { screen: "markets" };
+  }
 
   if (path === "/create") {
     return { screen: "create" };
@@ -56,6 +63,14 @@ const initialRoute = (): Route => {
 };
 
 const routePath = (route: Route) => {
+  if (route.screen === "landing") {
+    return "/";
+  }
+
+  if (route.screen === "markets") {
+    return "/markets";
+  }
+
   if (route.screen === "create") {
     return "/create";
   }
@@ -68,7 +83,7 @@ const routePath = (route: Route) => {
     return `/markets/${encodeURIComponent(route.marketId)}`;
   }
 
-  return "/";
+  return "/markets";
 };
 
 const shortAddress = (address?: string) =>
@@ -100,6 +115,21 @@ const looksLikeErrorStatus = (message: string) =>
   ["failed", "must", "not loaded", "unknown", "greater", "insufficient", "revert", "invalid", "unavailable", "could not"].some((token) =>
     message.toLowerCase().includes(token),
   );
+
+const isLoadingStatus = (status: string | null) => Boolean(status?.startsWith("Loading") || status?.startsWith("Refreshing"));
+
+const characterAvatarPaths = [
+  "/characters/avatars/iknow-avatar-01-smug.webp",
+  "/characters/avatars/iknow-avatar-02-focused.webp",
+  "/characters/avatars/iknow-avatar-03-surprised-amused.webp",
+  "/characters/avatars/iknow-avatar-04-skeptical.webp",
+  "/characters/avatars/iknow-avatar-05-delighted.webp",
+  "/characters/avatars/iknow-avatar-06-thinking.webp",
+  "/characters/avatars/iknow-avatar-07-annoyed.webp",
+  "/characters/avatars/iknow-avatar-08-calm-confident.webp",
+];
+
+const randomCharacterAvatar = () => characterAvatarPaths[Math.floor(Math.random() * characterAvatarPaths.length)];
 
 type BrowserEthereumProvider = Parameters<typeof custom>[0];
 
@@ -266,7 +296,7 @@ function App() {
   const { data: walletClient } = useWalletClient({ chainId: chainRuntimeMode === "arc-testnet" ? arcTestnetChain.id : undefined });
   const [connectorWalletClient, setConnectorWalletClient] = useState<WalletClient | undefined>(undefined);
   const [deployment, setDeployment] = useState<AppDeployment | null>(null);
-  const [deploymentState, setDeploymentState] = useState<"loading" | "ready" | "fallback">("loading");
+  const [deploymentStatus, setDeploymentStatus] = useState<"loading" | "ready" | "error">("loading");
   const connectedWalletAddress = account.address as `0x${string}` | undefined;
   const activeWalletClient = walletClient ?? connectorWalletClient;
   const actors = useMemo(() => devActorsFromDeployment(deployment, connectedWalletAddress), [deployment, connectedWalletAddress]);
@@ -281,11 +311,10 @@ function App() {
       }),
     [account.chainId, activeWalletClient, actors, connectedWalletAddress, deployment],
   );
-  const fallbackMarkets = dataSource.listMarkets();
+  const registryMarkets = dataSource.listMarkets();
   const [liveMarkets, setLiveMarkets] = useState<MarketReadModel[] | null>(null);
   const [marketReadbackStatus, setMarketReadbackStatus] = useState<string | null>(null);
-  const markets = liveMarkets ?? fallbackMarkets;
-  const actor = actors.find((candidate) => candidate.id === actorId) ?? actors[0];
+  const markets = liveMarkets ?? registryMarkets;
   const [chainRefreshKey, setChainRefreshKey] = useState(0);
   const themeColors = iknowTheme[theme].color;
   const appFrameStyle = {
@@ -320,13 +349,14 @@ function App() {
   } as CSSProperties;
 
   const refreshDeployment = async () => {
-    setDeploymentState("loading");
+    setDeploymentStatus("loading");
     try {
       const nextDeployment = await loadAppDeployment();
       setDeployment(nextDeployment);
-      setDeploymentState(nextDeployment ? "ready" : "fallback");
+      setDeploymentStatus(nextDeployment ? "ready" : "error");
     } catch {
-      setDeploymentState("fallback");
+      setDeployment(null);
+      setDeploymentStatus("error");
     }
   };
 
@@ -355,11 +385,12 @@ function App() {
           return;
         }
         setDeployment(nextDeployment);
-        setDeploymentState(nextDeployment ? "ready" : "fallback");
+        setDeploymentStatus(nextDeployment ? "ready" : "error");
       })
       .catch(() => {
         if (!cancelled) {
-          setDeploymentState("fallback");
+          setDeployment(null);
+          setDeploymentStatus("error");
         }
       });
 
@@ -392,7 +423,19 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    setMarketReadbackStatus("Refreshing live markets...");
+    if (!deployment) {
+      setLiveMarkets(null);
+      setMarketReadbackStatus(
+        deploymentStatus === "loading"
+          ? `Loading ${chainRuntimeMode === "arc-testnet" ? "Arc Testnet" : "local"} markets...`
+          : `Unable to load ${chainRuntimeMode === "arc-testnet" ? "Arc Testnet" : "local"} markets. Check the local API and deployment artifact.`,
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setMarketReadbackStatus("Loading live markets...");
     dataSource
       .readMarkets()
       .then((nextMarkets) => {
@@ -413,7 +456,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [dataSource, chainRefreshKey]);
+  }, [dataSource, chainRefreshKey, deployment, deploymentStatus]);
 
   const addCreatedMarket = (market: DeployedMarket) => {
     setDeployment((current) => {
@@ -445,15 +488,15 @@ function App() {
       />
 
       <main className="workspace">
-        <LocalDemoControls
-          actor={actor}
-          actorId={actorId}
-          actors={actors}
-          deploymentState={deploymentState}
-          surface={surface}
-          onActorChange={setActorId}
-          onRefresh={refreshChainReadbacks}
-        />
+        {route.screen === "landing" && (
+          <LandingScreen
+            markets={markets}
+            readbackStatus={marketReadbackStatus}
+            onBrowseMarkets={() => navigate({ screen: "markets" })}
+            onCreateMarket={() => navigate({ screen: "create" })}
+            onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
+          />
+        )}
         {route.screen === "markets" && (
           <MarketsScreen
             markets={markets}
@@ -511,11 +554,12 @@ function ShellHeader({
   onNavigate: (route: Route) => void;
   onToggleTheme: () => void;
 }) {
-  const isHome = route.screen === "markets" || route.screen === "market";
+  const isHome = route.screen === "landing";
+  const isMarkets = route.screen === "markets" || route.screen === "market";
 
   return (
     <header className="shell-topbar">
-      <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "markets" })}>
+      <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "landing" })}>
         <MugMascot />
         <span>
           <strong>iknow</strong>
@@ -524,8 +568,11 @@ function ShellHeader({
       </button>
 
       <nav className="shell-nav" aria-label="Main navigation">
-        <button className={isHome ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "markets" })}>
+        <button className={isHome ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "landing" })}>
           Home
+        </button>
+        <button className={isMarkets ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "markets" })}>
+          Markets
         </button>
         <button
           className={route.screen === "create" ? "active" : ""}
@@ -722,64 +769,98 @@ function HeaderWalletAction() {
   );
 }
 
-function LocalDemoControls({
-  actor,
-  actorId,
-  actors,
-  deploymentState,
-  surface,
-  onActorChange,
-  onRefresh,
+function LandingScreen({
+  markets,
+  readbackStatus,
+  onBrowseMarkets,
+  onCreateMarket,
+  onOpenMarket,
 }: {
-  actor: DevActor;
-  actorId: string;
-  actors: DevActor[];
-  deploymentState: string;
-  surface: ReturnType<typeof contractSurface>;
-  onActorChange: (actorId: string) => void;
-  onRefresh: () => void;
+  markets: MarketReadModel[];
+  readbackStatus: string | null;
+  onBrowseMarkets: () => void;
+  onCreateMarket: () => void;
+  onOpenMarket: (marketId: string) => void;
 }) {
-  const isArcTestnet = surface.chainId !== 31337;
+  const featuredMarkets = markets.slice(0, 3);
+  const openMarkets = markets.filter((market) => market.status === "Open").length;
+  const loadingMarkets = isLoadingStatus(readbackStatus);
+  const hasNoMarkets = markets.length === 0;
 
   return (
-    <details className="local-demo-controls">
-      <summary>{isArcTestnet ? "Testnet controls" : "Local demo controls"}</summary>
-      <div className="local-demo-grid">
-        <label>
-          {isArcTestnet ? "Signer" : "Actor"}
-          <select value={actorId} disabled={isArcTestnet} onChange={(event) => onActorChange(event.target.value)}>
-            {actors.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <dl className="compact-list">
-          <div>
-            <dt>Role</dt>
-            <dd>{actor.role}</dd>
+    <div className="landing-page">
+      <section className="landing-hero">
+        <div className="landing-hero-copy">
+          <p className="eyebrow">Arc-native prediction markets</p>
+          <h1>iknow</h1>
+          <p>Create a YES/NO market from a Source, let agents check the rules, and settle outcomes with visible evidence.</p>
+          <div className="hero-actions">
+            <button type="button" onClick={onCreateMarket}>
+              Create from Source
+            </button>
+            <button className="secondary" type="button" onClick={onBrowseMarkets}>
+              Browse markets
+            </button>
           </div>
+        </div>
+        <div className="landing-mascot-stage" aria-hidden="true">
+          <MugMascot className="landing-mascot" />
+          <span>calls with receipts</span>
+        </div>
+      </section>
+
+      {readbackStatus && <p className={isLoadingStatus(readbackStatus) ? "status-text" : "error-text"}>{readbackStatus}</p>}
+
+      <section className="landing-proof-strip" aria-label="iknow product loop">
+        <div>
+          <span>1</span>
+          <strong>Import</strong>
+          <p>Start from Source market metadata instead of a blank form.</p>
+        </div>
+        <div>
+          <span>2</span>
+          <strong>Review</strong>
+          <p>Agents score whether the rules can be resolved later.</p>
+        </div>
+        <div>
+          <span>3</span>
+          <strong>Settle</strong>
+          <p>Evidence packets explain the final Yes, No, or Invalid call.</p>
+        </div>
+      </section>
+
+      <section className="landing-market-band">
+        <div className="section-header">
           <div>
-            <dt>Address</dt>
-            <dd>{shortAddress(actor.address)}</dd>
+            <p className="eyebrow">Live board</p>
+            <h2>{loadingMarkets && hasNoMarkets ? "Loading markets" : `${markets.length} markets, ${openMarkets} open`}</h2>
           </div>
-        </dl>
-        <dl className="compact-list">
-          <div>
-            <dt>Deployment</dt>
-            <dd>{deploymentState === "ready" ? "Loaded" : deploymentState === "loading" ? "Loading" : `Fallback (${apiBaseUrl})`}</dd>
-          </div>
-          <div>
-            <dt>Factory</dt>
-            <dd>{shortAddress(surface.marketFactory)}</dd>
-          </div>
-        </dl>
-        <button className="secondary" type="button" onClick={onRefresh}>
-          Refresh
-        </button>
-      </div>
-    </details>
+          <button className="secondary" type="button" onClick={onBrowseMarkets}>
+            Open board
+          </button>
+        </div>
+        <div className="landing-market-grid">
+          {hasNoMarkets ? (
+            <MarketLoadingState isLoading={loadingMarkets} />
+          ) : featuredMarkets.map((market) => (
+            <article className="landing-market-card" key={market.id}>
+              <div>
+                <span className="status">{market.status}</span>
+                <h3>{market.question}</h3>
+                <p>Closes {formatDate(market.closeTime)}</p>
+              </div>
+              <div className="landing-price-row">
+                <span>YES {Math.round(market.yesPrice * 100)}¢</span>
+                <span>NO {Math.round(market.noPrice * 100)}¢</span>
+              </div>
+              <button className="secondary" type="button" onClick={() => onOpenMarket(market.id)}>
+                View market
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -792,6 +873,8 @@ function MarketsScreen({
   readbackStatus: string | null;
   onOpenMarket: (marketId: string) => void;
 }) {
+  const loadingMarkets = isLoadingStatus(readbackStatus);
+
   return (
     <>
       <header className="page-header">
@@ -801,9 +884,7 @@ function MarketsScreen({
         </div>
         <span className="count-pill">{markets.length} markets</span>
       </header>
-      {readbackStatus && (
-        <p className={readbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{readbackStatus}</p>
-      )}
+      {readbackStatus && <p className={isLoadingStatus(readbackStatus) ? "status-text" : "error-text"}>{readbackStatus}</p>}
 
       <section className="market-table" aria-label="Markets">
         <div className="market-row table-head">
@@ -812,16 +893,19 @@ function MarketsScreen({
           <span>YES</span>
           <span>NO</span>
           <span>Liquidity</span>
-          <span />
         </div>
-        {markets.map((market) => (
+        {markets.length === 0 ? (
+          <MarketLoadingState isLoading={loadingMarkets} />
+        ) : markets.map((market) => (
           <article className="market-row" key={market.id}>
             <div className="market-row-main">
               {(market.imageUrl || market.sourceIdea?.imageUrl) && (
                 <img className="market-thumb" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
               )}
               <div>
-                <h2>{market.question}</h2>
+                <button className="market-title-button" type="button" onClick={() => onOpenMarket(market.id)}>
+                  {market.question}
+                </button>
                 <p>Closes {formatDate(market.closeTime)}</p>
               </div>
             </div>
@@ -829,13 +913,26 @@ function MarketsScreen({
             <strong>{Math.round(market.yesPrice * 100)}¢</strong>
             <strong>{Math.round(market.noPrice * 100)}¢</strong>
             <span>{market.liquidity}</span>
-            <button className="secondary" onClick={() => onOpenMarket(market.id)}>
-              Open
-            </button>
           </article>
         ))}
       </section>
     </>
+  );
+}
+
+function MarketLoadingState({ isLoading }: { isLoading: boolean }) {
+  return (
+    <div className="empty-state inline market-loading-state">
+      <h2>{isLoading ? "Loading markets" : "Markets unavailable"}</h2>
+      <p>{isLoading ? "We are loading the latest Arc Testnet markets." : "The market registry is not available right now."}</p>
+      {isLoading && (
+        <div className="loading-markers" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2618,9 +2715,9 @@ function CreateScreen({
   );
 }
 
-function MugMascot() {
+function MugMascot({ className = "" }: { className?: string }) {
   return (
-    <div className="create-mascot" aria-hidden="true">
+    <div className={`create-mascot ${className}`.trim()} aria-hidden="true">
       <span className="create-mascot-handle" />
       <span className="create-mascot-smirk" />
     </div>
@@ -2742,7 +2839,8 @@ function PortfolioScreen({
         if (cancelled) {
           return;
         }
-        setLpReadbackStatus(caught instanceof Error ? caught.message : "LP portfolio readback unavailable");
+        const message = caught instanceof Error ? caught.message : "LP portfolio readback unavailable";
+        setLpReadbackStatus(message.includes("not ready yet") ? "Loading profile..." : null);
       });
 
     return () => {
@@ -2771,6 +2869,60 @@ function PortfolioScreen({
   const readyActions = claimActions.filter((action) => action.enabled);
   const lpFeeActions = funding.filter((position) => rawAmountIsPositive(position.pendingLpFeesRaw));
   const primaryReadyAction = readyActions[0];
+  const avatarPath = useMemo(randomCharacterAvatar, []);
+  const isPortfolioLoading = Boolean(lpReadbackStatus && !livePortfolio);
+  const firstPosition = calls[0];
+  const firstCreatedMarket = createdMarkets[0];
+  const firstResolvedPosition = portfolio.positions.find((position) => position.status === "Resolved");
+  const firstFundedPosition = funding[0];
+  const claimCardTitle = primaryReadyAction ? "Receipts posted. You called it." : "No claimable USDC yet.";
+  const claimCardAmount = primaryReadyAction?.amount ?? "0 USDC";
+  const claimCardHelper = primaryReadyAction
+    ? `${primaryReadyAction.label} is ready for your wallet.`
+    : "When a market resolves in your favor, it will show up here.";
+  const activityItems = [
+    firstPosition
+      ? {
+          title: `You bought ${positionSideLabel(firstPosition)} exposure`,
+          detail: firstPosition.marketQuestion,
+        }
+      : {
+          title: "No positions yet",
+          detail: "Your first YES or NO trade will appear here.",
+        },
+    firstResolvedPosition
+      ? {
+          title: "Evidence packet posted",
+          detail: `${firstResolvedPosition.resolution || "Outcome"} recommended · ${firstResolvedPosition.marketQuestion}`,
+        }
+      : {
+          title: "Evidence packets pending",
+          detail: "Resolved markets will show their receipts here.",
+        },
+    primaryReadyAction
+      ? {
+          title: `${primaryReadyAction.amount} ready to claim`,
+          detail: primaryReadyAction.label,
+        }
+      : {
+          title: "No USDC claim ready",
+          detail: "Claims unlock after final resolution.",
+        },
+    firstCreatedMarket
+      ? {
+          title: "You seeded a market",
+          detail: `${firstCreatedMarket.marketQuestion} · creator deposit tracked`,
+        }
+      : firstFundedPosition
+        ? {
+            title: "You provided liquidity",
+            detail: `${firstFundedPosition.marketQuestion} · LP shares tracked`,
+          }
+        : {
+            title: "No creator markets yet",
+            detail: "Seed a market when you want to start the pool.",
+          },
+  ];
 
   const runPortfolioAction = async (label: string, action: () => Promise<string>) => {
     setActionLabel(label);
@@ -2804,9 +2956,7 @@ function PortfolioScreen({
     <div className="portfolio-page">
       <section className="portfolio-hero">
         <div className="portfolio-identity">
-          <div className="portfolio-avatar" aria-hidden="true">
-            {portfolio.actor.name.slice(0, 1)}
-          </div>
+          <img className="portfolio-avatar" src={avatarPath} alt="" aria-hidden="true" />
           <div>
             <p className="eyebrow">Your iknow</p>
             <h1>{portfolio.actor.name}</h1>
@@ -2816,264 +2966,239 @@ function PortfolioScreen({
           </div>
         </div>
         <div className="portfolio-hero-stats">
-          <Metric label="Markets joined" value={String(calls.length)} />
-          <Metric label="Markets funded" value={String(funding.length)} />
+          <Metric label="Markets traded" value={String(calls.length)} />
+          <Metric label="Markets created" value={String(createdMarkets.length)} />
           <Metric label="Ready to claim" value={String(readyActions.length)} />
-          <Metric label="USDC balance" value={portfolio.actor.usdcBalance} />
         </div>
       </section>
-      {lpReadbackStatus && !livePortfolio && (
-        <p className={lpReadbackStatus.startsWith("Refreshing") ? "status-text" : "error-text"}>{lpReadbackStatus}</p>
-      )}
 
-      <section className="portfolio-ready-grid" aria-label="Ready for you">
-        <article className="portfolio-claim-card primary">
-          <span>Ready for you</span>
-          <h2>{primaryReadyAction?.amount ?? "0 USDC"}</h2>
-          <p>{primaryReadyAction ? `${primaryReadyAction.label} is ready.` : "No balances are ready right now."}</p>
-          <button disabled={!primaryReadyAction || !isWalletReady || actionPhase === "pending"} onClick={() => primaryReadyAction && executeClaimAction(primaryReadyAction)}>
-            {primaryReadyAction?.label ?? "Nothing to claim"}
-          </button>
-        </article>
-        <MoneyActionCard
-          label="Claim winnings"
-          value={portfolio.totals.winnings}
-          helper="Winning resolved calls ready to collect."
-          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "winnings")}
-          onClick={() => {
-            const action = readyActions.find((candidate) => candidate.kind === "winnings");
-            if (action) {
-              executeClaimAction(action);
-            }
-          }}
-        />
-        <MoneyActionCard
-          label="Claim creator earnings"
-          value={portfolio.totals.creatorEarnings}
-          helper="Fees from markets you created."
-          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "creator")}
-          onClick={() => {
-            const action = readyActions.find((candidate) => candidate.kind === "creator");
-            if (action) {
-              executeClaimAction(action);
-            }
-          }}
-        />
-        <MoneyActionCard
-          label="Claim safety deposit"
-          value={portfolio.totals.safetyDeposit}
-          helper="Creation bond returned after valid resolution."
-          disabled={!isWalletReady || actionPhase === "pending" || !readyActions.some((action) => action.kind === "bond")}
-          onClick={() => {
-            const action = readyActions.find((candidate) => candidate.kind === "bond");
-            if (action) {
-              executeClaimAction(action);
-            }
-          }}
-        />
-        <MoneyActionCard
-          label="Remove funding to collect fees"
-          value={portfolio.totals.lpFees}
-          helper="Fees earned by funding. Remove funding from the market to collect."
-          disabled={lpFeeActions.length === 0}
-          onClick={() => {
-            const position = lpFeeActions[0] ?? funding[0];
-            if (position) {
-              onOpenMarket(position.marketId);
-            }
-          }}
-        />
-      </section>
       <TicketActionProgress phase={actionPhase} label={actionLabel} />
       {actionStatus && <p className={looksLikeErrorStatus(actionStatus) ? "error-text" : "status-text"}>{actionStatus}</p>}
 
-      <section className="portfolio-section portfolio-profile-panel">
-        <div className="portfolio-section-head">
-          <div>
-            <h2>Your profile</h2>
-            <span>Calls, funding, and markets you created in one table.</span>
-          </div>
-        </div>
-
-        <div className="portfolio-tab-list" role="tablist" aria-label="Profile sections">
-          <button
-            className={`portfolio-tab ${portfolioTab === "calls" ? "active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={portfolioTab === "calls"}
-            onClick={() => setPortfolioTab("calls")}
-          >
-            Your calls <span>{calls.length}</span>
-          </button>
-          <button
-            className={`portfolio-tab ${portfolioTab === "funding" ? "active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={portfolioTab === "funding"}
-            onClick={() => setPortfolioTab("funding")}
-          >
-            Funding <span>{funding.length}</span>
-          </button>
-          <button
-            className={`portfolio-tab ${portfolioTab === "created" ? "active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={portfolioTab === "created"}
-            onClick={() => setPortfolioTab("created")}
-          >
-            Created <span>{createdMarkets.length}</span>
-          </button>
-        </div>
-
-        {portfolioTab === "calls" && (
-          <div className="portfolio-tab-panel" role="tabpanel">
-            {calls.length === 0 ? (
-              <div className="empty-state inline">
-                <h2>No active positions yet</h2>
+      <section className="portfolio-layout">
+        <div>
+          <section className="portfolio-section portfolio-profile-panel">
+            <div className="portfolio-section-head">
+              <div>
+                <h2>Your portfolio</h2>
+                <span>Wallet positions, liquidity, creator deposits, and receipts in one place.</span>
               </div>
-            ) : (
-              <div className="portfolio-table calls">
-                <div className="portfolio-table-row table-head">
-                  <span>Market</span>
-                  <span>Pick</span>
-                  <span>Position</span>
-                  <span>Status</span>
-                  <span>Action</span>
-                </div>
-                {calls.map((position) => {
-                  const winningAction = claimActionsForPosition(position).find((action) => action.kind === "winnings");
-                  const hasYes = rawAmountIsPositive(position.yesSharesRaw);
-                  const hasNo = rawAmountIsPositive(position.noSharesRaw);
-                  const pickLabel = hasYes && hasNo ? "YES + NO" : hasYes ? "YES" : "NO";
-                  const positionLabel = [
-                    hasYes ? `${position.yesShares} YES` : null,
-                    hasNo ? `${position.noShares} NO` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ");
-                  return (
-                    <div className="portfolio-table-row" key={`call-${position.marketId}`}>
-                      <div className="portfolio-table-market">
-                        <strong>{position.marketQuestion}</strong>
-                        <span>{positionCallLabel(position)}</span>
-                      </div>
-                      <div className="portfolio-table-cell">
-                        <strong>{pickLabel}</strong>
-                      </div>
-                      <div className="portfolio-table-cell">
-                        <strong>{positionLabel}</strong>
-                        <span>shares</span>
-                      </div>
-                      <span className={`status ${positionStatusTone(position)}`}>{positionClaimStatus(position)}</span>
-                      {winningAction?.enabled ? (
-                        <button disabled={!isWalletReady || actionPhase === "pending"} onClick={() => executeClaimAction(winningAction)}>
-                          Claim
-                        </button>
-                      ) : (
-                        <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                          View market
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        {portfolioTab === "funding" && (
-          <div className="portfolio-tab-panel" role="tabpanel">
-            {funding.length === 0 ? (
-              <div className="empty-state inline">
-                <h2>No funding positions</h2>
-              </div>
-            ) : (
-              <div className="portfolio-table funding">
-                <div className="portfolio-table-row table-head">
-                  <span>Market</span>
-                  <span>Funded</span>
-                  <span>Fees earned</span>
-                  <span>Status</span>
-                  <span>Action</span>
-                </div>
-                {funding.map((position) => (
-                  <div className="portfolio-table-row" key={`funding-${position.marketId}`}>
-                    <div className="portfolio-table-market">
-                      <strong>{position.marketQuestion}</strong>
-                      <span>Liquidity provider</span>
+            <div className="portfolio-tab-list" role="tablist" aria-label="Profile sections">
+              <button
+                className={`portfolio-tab ${portfolioTab === "calls" ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={portfolioTab === "calls"}
+                onClick={() => setPortfolioTab("calls")}
+              >
+                Positions <span>{calls.length}</span>
+              </button>
+              <button
+                className={`portfolio-tab ${portfolioTab === "funding" ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={portfolioTab === "funding"}
+                onClick={() => setPortfolioTab("funding")}
+              >
+                Liquidity <span>{funding.length}</span>
+              </button>
+              <button
+                className={`portfolio-tab ${portfolioTab === "created" ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={portfolioTab === "created"}
+                onClick={() => setPortfolioTab("created")}
+              >
+                Created <span>{createdMarkets.length}</span>
+              </button>
+            </div>
+
+            {portfolioTab === "calls" && (
+              <div className="portfolio-tab-panel" role="tabpanel">
+                {calls.length === 0 ? (
+                  <PortfolioTableEmptyState isLoading={isPortfolioLoading} emptyLabel="No active positions yet" />
+                ) : (
+                  <div className="portfolio-table calls">
+                    <div className="portfolio-table-row table-head">
+                      <span>Market</span>
+                      <span>Side</span>
+                      <span>Position</span>
+                      <span>Status</span>
+                      <span>Action</span>
                     </div>
-                    <div className="portfolio-table-cell">
-                      <strong>{position.lpShares}</strong>
-                    </div>
-                    <div className="portfolio-table-cell">
-                      <strong>{position.pendingLpFees}</strong>
-                    </div>
-                    <span className="status">{position.status}</span>
-                    <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                      Remove
-                    </button>
+                    {calls.map((position) => {
+                      const winningAction = claimActionsForPosition(position).find((action) => action.kind === "winnings");
+                      const positionLabel = positionShareLabel(position);
+                      return (
+                        <div className="portfolio-table-row" key={`call-${position.marketId}`}>
+                          <div className="portfolio-table-market">
+                            <strong>{position.marketQuestion}</strong>
+                            <span>{positionCallLabel(position)}</span>
+                          </div>
+                          <div className="portfolio-table-cell">
+                            <strong>{positionSideLabel(position)}</strong>
+                          </div>
+                          <div className="portfolio-table-cell">
+                            <strong>{positionLabel}</strong>
+                            <span>{position.status === "Resolved" ? "winnings" : "exposure"}</span>
+                          </div>
+                          <span className={`status ${positionStatusTone(position)}`}>{positionClaimStatus(position)}</span>
+                          {winningAction?.enabled ? (
+                            <button disabled={!isWalletReady || actionPhase === "pending"} onClick={() => executeClaimAction(winningAction)}>
+                              Claim
+                            </button>
+                          ) : (
+                            <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                              View market
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {portfolioTab === "created" && (
-          <div className="portfolio-tab-panel" role="tabpanel">
-            {createdMarkets.length === 0 ? (
-              <div className="empty-state inline">
-                <h2>No creator balances</h2>
-              </div>
-            ) : (
-              <div className="portfolio-table created">
-                <div className="portfolio-table-row table-head">
-                  <span>Market</span>
-                  <span>Earnings</span>
-                  <span>Deposit</span>
-                  <span>Status</span>
-                  <span>Action</span>
-                </div>
-                {createdMarkets.map((position) => {
-                  const creatorActions = claimActionsForPosition(position).filter((action) => action.kind === "creator" || action.kind === "bond");
-                  const enabledCreatorActions = creatorActions.filter((action) => action.enabled);
-                  return (
-                    <div className="portfolio-table-row" key={`created-${position.marketId}`}>
-                      <div className="portfolio-table-market">
-                        <strong>{position.marketQuestion}</strong>
-                        <span>{position.status === "Resolved" ? `Resolved ${position.resolution}` : position.status}</span>
-                      </div>
-                      <div className="portfolio-table-cell">
-                        <strong>{position.creatorFees}</strong>
-                      </div>
-                      <div className="portfolio-table-cell">
-                        <strong>{position.creationBond}</strong>
-                      </div>
-                      <span className="status">{enabledCreatorActions.length > 0 ? "Ready to claim" : "Waiting"}</span>
-                      <div className="portfolio-table-actions">
-                        {enabledCreatorActions.map((action) => (
-                          <button
-                            key={`${action.kind}-${action.marketId}`}
-                            disabled={!isWalletReady || actionPhase === "pending"}
-                            onClick={() => executeClaimAction(action)}
-                          >
-                            {action.kind === "creator" ? "Claim earnings" : "Claim deposit"}
-                          </button>
-                        ))}
+            {portfolioTab === "funding" && (
+              <div className="portfolio-tab-panel" role="tabpanel">
+                {funding.length === 0 ? (
+                  <PortfolioTableEmptyState isLoading={isPortfolioLoading} emptyLabel="No liquidity positions" />
+                ) : (
+                  <div className="portfolio-table funding">
+                    <div className="portfolio-table-row table-head">
+                      <span>Market</span>
+                      <span>LP shares</span>
+                      <span>Fees earned</span>
+                      <span>Status</span>
+                      <span>Action</span>
+                    </div>
+                    {funding.map((position) => (
+                      <div className="portfolio-table-row" key={`funding-${position.marketId}`}>
+                        <div className="portfolio-table-market">
+                          <strong>{position.marketQuestion}</strong>
+                          <span>USDC-backed AMM liquidity</span>
+                        </div>
+                        <div className="portfolio-table-cell">
+                          <strong>{position.lpShares}</strong>
+                        </div>
+                        <div className="portfolio-table-cell">
+                          <strong>{position.pendingLpFees}</strong>
+                        </div>
+                        <span className="status">{position.status}</span>
                         <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
-                          View market
+                          Remove
                         </button>
                       </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-      </section>
 
+            {portfolioTab === "created" && (
+              <div className="portfolio-tab-panel" role="tabpanel">
+                {createdMarkets.length === 0 ? (
+                  <PortfolioTableEmptyState isLoading={isPortfolioLoading} emptyLabel="No creator balances" />
+                ) : (
+                  <div className="portfolio-table created">
+                    <div className="portfolio-table-row table-head">
+                      <span>Market</span>
+                      <span>Earnings</span>
+                      <span>Safety deposit</span>
+                      <span>Status</span>
+                      <span>Action</span>
+                    </div>
+                    {createdMarkets.map((position) => {
+                      const creatorActions = claimActionsForPosition(position).filter((action) => action.kind === "creator" || action.kind === "bond");
+                      const enabledCreatorActions = creatorActions.filter((action) => action.enabled);
+                      return (
+                        <div className="portfolio-table-row" key={`created-${position.marketId}`}>
+                          <div className="portfolio-table-market">
+                            <strong>{position.marketQuestion}</strong>
+                            <span>Creator-seeded market</span>
+                          </div>
+                          <div className="portfolio-table-cell">
+                            <strong>{position.creatorFees}</strong>
+                          </div>
+                          <div className="portfolio-table-cell">
+                            <strong>{position.creationBond}</strong>
+                          </div>
+                          <span className="status">{enabledCreatorActions.length > 0 ? "Ready to claim" : "Waiting"}</span>
+                          <div className="portfolio-table-actions">
+                            {enabledCreatorActions.map((action) => (
+                              <button
+                                key={`${action.kind}-${action.marketId}`}
+                                disabled={!isWalletReady || actionPhase === "pending"}
+                                onClick={() => executeClaimAction(action)}
+                              >
+                                {action.kind === "creator" ? "Claim earnings" : "Claim deposit"}
+                              </button>
+                            ))}
+                            <button className="secondary" onClick={() => onOpenMarket(position.marketId)}>
+                              View market
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <aside className="portfolio-sidebar">
+          <article className="portfolio-claim-card primary portfolio-sidebar-claim">
+            <span>{claimCardTitle}</span>
+            <h2>{claimCardAmount}</h2>
+            <p>{claimCardHelper}</p>
+            <button disabled={!primaryReadyAction || !isWalletReady || actionPhase === "pending"} onClick={() => primaryReadyAction && executeClaimAction(primaryReadyAction)}>
+              {primaryReadyAction?.label ?? "Nothing to claim"}
+            </button>
+          </article>
+
+          <section className="portfolio-section portfolio-activity-panel">
+            <div className="portfolio-section-head">
+              <div>
+                <h2>Activity</h2>
+              </div>
+            </div>
+            <div className="portfolio-activity-list">
+              {activityItems.map((item) => (
+                <div className="portfolio-activity-item" key={`${item.title}-${item.detail}`}>
+                  <span className="portfolio-activity-dot" aria-hidden="true" />
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{item.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </section>
+    </div>
+  );
+}
+
+function PortfolioTableEmptyState({ isLoading, emptyLabel }: { isLoading: boolean; emptyLabel: string }) {
+  return (
+    <div className="empty-state inline market-loading-state">
+      <h2>{isLoading ? "Loading profile" : emptyLabel}</h2>
+      {isLoading && (
+        <>
+          <p>We are loading your latest Arc Testnet positions.</p>
+          <div className="loading-markers" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -3096,6 +3221,31 @@ function rawAmountIsPositive(value: string) {
 
 function hasTokenPosition(position: PortfolioPosition) {
   return rawAmountIsPositive(position.yesSharesRaw) || rawAmountIsPositive(position.noSharesRaw);
+}
+
+function positionSideLabel(position: PortfolioPosition) {
+  const hasYes = rawAmountIsPositive(position.yesSharesRaw);
+  const hasNo = rawAmountIsPositive(position.noSharesRaw);
+
+  if (hasYes && hasNo) {
+    return "YES + NO";
+  }
+  if (hasYes) {
+    return "YES";
+  }
+  if (hasNo) {
+    return "NO";
+  }
+  return "None";
+}
+
+function positionShareLabel(position: PortfolioPosition) {
+  const shares = [
+    rawAmountIsPositive(position.yesSharesRaw) ? `${position.yesShares} YES` : null,
+    rawAmountIsPositive(position.noSharesRaw) ? `${position.noShares} NO` : null,
+  ].filter(Boolean);
+
+  return shares.length > 0 ? shares.join(" / ") : "0";
 }
 
 function positionCallLabel(position: PortfolioPosition) {
