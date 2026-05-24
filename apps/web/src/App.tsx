@@ -427,11 +427,7 @@ function App() {
 
     if (!deployment) {
       setLiveMarkets(null);
-      setMarketReadbackStatus(
-        deploymentStatus === "loading"
-          ? `Loading ${chainRuntimeMode === "arc-testnet" ? "Arc Testnet" : "local"} markets...`
-          : `Unable to load ${chainRuntimeMode === "arc-testnet" ? "Arc Testnet" : "local"} markets. Check the local API and deployment artifact.`,
-      );
+      setMarketReadbackStatus(deploymentStatus === "loading" ? "Loading markets..." : null);
       return () => {
         cancelled = true;
       };
@@ -452,7 +448,7 @@ function App() {
           return;
         }
         setLiveMarkets(null);
-        setMarketReadbackStatus(caught instanceof Error ? caught.message : "Live market readback unavailable");
+        setMarketReadbackStatus("Market data is unavailable right now.");
       });
 
     return () => {
@@ -484,7 +480,6 @@ function App() {
       {route.screen !== "landing" && (
         <ShellHeader
           route={route}
-          surface={surface}
           theme={theme}
           onNavigate={navigate}
           onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
@@ -543,23 +538,20 @@ function App() {
 
 function ShellHeader({
   route,
-  surface,
   theme,
   onNavigate,
   onToggleTheme,
 }: {
   route: Route;
-  surface: ReturnType<typeof contractSurface>;
   theme: "light" | "dark";
   onNavigate: (route: Route) => void;
   onToggleTheme: () => void;
 }) {
-  const isHome = route.screen === "landing";
   const isMarkets = route.screen === "markets" || route.screen === "market";
 
   return (
     <header className="shell-topbar">
-      <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "landing" })}>
+      <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "markets" })}>
         <SmugAppIcon />
         <span>
           <strong>iknow</strong>
@@ -567,9 +559,6 @@ function ShellHeader({
       </button>
 
       <nav className="shell-nav" aria-label="Main navigation">
-        <button className={isHome ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "landing" })}>
-          Home
-        </button>
         <button className={isMarkets ? "active" : ""} type="button" onClick={() => onNavigate({ screen: "markets" })}>
           Markets
         </button>
@@ -593,7 +582,6 @@ function ShellHeader({
         <button className="shell-pill" type="button" onClick={onToggleTheme}>
           {theme === "dark" ? "Light mode" : "Dark mode"}
         </button>
-        <span className="shell-pill">{surface.chainName || "Arc Testnet"}</span>
         <HeaderWalletAction />
       </div>
     </header>
@@ -997,7 +985,7 @@ function MarketsScreen({
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Home</p>
+          <p className="eyebrow">Markets</p>
           <h1>What do you know today?</h1>
         </div>
         <span className="count-pill">{markets.length} markets</span>
@@ -1042,7 +1030,7 @@ function MarketLoadingState({ isLoading }: { isLoading: boolean }) {
   return (
     <div className="empty-state inline market-loading-state">
       <h2>{isLoading ? "Loading markets" : "Markets unavailable"}</h2>
-      <p>{isLoading ? "We are loading the latest Arc Testnet markets." : "The market registry is not available right now."}</p>
+      <p>{isLoading ? "We are loading the latest markets." : "The market registry is not available right now."}</p>
       {isLoading && (
         <div className="loading-markers" aria-hidden="true">
           <span />
