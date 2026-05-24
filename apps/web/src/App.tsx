@@ -116,6 +116,8 @@ const looksLikeErrorStatus = (message: string) =>
     message.toLowerCase().includes(token),
   );
 
+const themeStorageKey = "iknow-theme-v2";
+
 const isLoadingStatus = (status: string | null) => Boolean(status?.startsWith("Loading") || status?.startsWith("Refreshing"));
 
 const characterAvatarPaths = [
@@ -290,7 +292,7 @@ async function readDeploymentBlockClockMs(deployment: AppDeployment) {
 function App() {
   const [route, setRoute] = useState<Route>(initialRoute);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
-    window.localStorage.getItem("iknow-theme") === "dark" ? "dark" : "light",
+    window.localStorage.getItem(themeStorageKey) === "light" ? "light" : "dark",
   );
   const account = useAccount();
   const { data: walletClient } = useWalletClient({ chainId: chainRuntimeMode === "arc-testnet" ? arcTestnetChain.id : undefined });
@@ -373,7 +375,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("iknow-theme", theme);
+    window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
   useEffect(() => {
@@ -479,22 +481,20 @@ function App() {
 
   return (
     <div className="app-frame" data-theme={theme} style={appFrameStyle}>
-      <ShellHeader
-        route={route}
-        surface={surface}
-        theme={theme}
-        onNavigate={navigate}
-        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-      />
+      {route.screen !== "landing" && (
+        <ShellHeader
+          route={route}
+          surface={surface}
+          theme={theme}
+          onNavigate={navigate}
+          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        />
+      )}
 
-      <main className="workspace">
+      <main className={route.screen === "landing" ? "workspace landing-workspace" : "workspace"}>
         {route.screen === "landing" && (
           <LandingScreen
-            markets={markets}
-            readbackStatus={marketReadbackStatus}
             onBrowseMarkets={() => navigate({ screen: "markets" })}
-            onCreateMarket={() => navigate({ screen: "create" })}
-            onOpenMarket={(marketId) => navigate({ screen: "market", marketId })}
           />
         )}
         {route.screen === "markets" && (
@@ -560,10 +560,9 @@ function ShellHeader({
   return (
     <header className="shell-topbar">
       <button className="shell-brand" type="button" onClick={() => onNavigate({ screen: "landing" })}>
-        <MugMascot />
+        <SmugAppIcon />
         <span>
           <strong>iknow</strong>
-          <span>calls with receipts</span>
         </span>
       </button>
 
@@ -769,95 +768,214 @@ function HeaderWalletAction() {
   );
 }
 
-function LandingScreen({
-  markets,
-  readbackStatus,
-  onBrowseMarkets,
-  onCreateMarket,
-  onOpenMarket,
-}: {
-  markets: MarketReadModel[];
-  readbackStatus: string | null;
-  onBrowseMarkets: () => void;
-  onCreateMarket: () => void;
-  onOpenMarket: (marketId: string) => void;
-}) {
-  const featuredMarkets = markets.slice(0, 3);
-  const openMarkets = markets.filter((market) => market.status === "Open").length;
-  const loadingMarkets = isLoadingStatus(readbackStatus);
-  const hasNoMarkets = markets.length === 0;
+function LandingScreen({ onBrowseMarkets }: { onBrowseMarkets: () => void }) {
+  const [characterState, setCharacterState] = useState<"smug" | "focus" | "surprised">("smug");
+
+  useEffect(() => {
+    const sections = Array.from(document.querySelectorAll<HTMLElement>(".landing-story-screen[data-character-state]"));
+    let frame = 0;
+
+    const syncCharacterState = () => {
+      const viewportCenter = window.innerHeight / 2;
+      const active = sections
+        .map((section) => {
+          const rect = section.getBoundingClientRect();
+          return {
+            distance: Math.abs(rect.top + rect.height / 2 - viewportCenter),
+            section,
+          };
+        })
+        .sort((a, b) => a.distance - b.distance)[0]?.section.dataset.characterState;
+
+      if (active === "smug" || active === "focus" || active === "surprised") {
+        setCharacterState(active);
+      }
+
+      frame = 0;
+    };
+
+    const requestCharacterSync = () => {
+      if (frame) {
+        return;
+      }
+      frame = window.requestAnimationFrame(syncCharacterState);
+    };
+
+    syncCharacterState();
+    window.addEventListener("scroll", requestCharacterSync, { passive: true });
+    window.addEventListener("resize", requestCharacterSync);
+
+    return () => {
+      window.removeEventListener("scroll", requestCharacterSync);
+      window.removeEventListener("resize", requestCharacterSync);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  }, []);
 
   return (
-    <div className="landing-page">
-      <section className="landing-hero">
-        <div className="landing-hero-copy">
-          <p className="eyebrow">Arc-native prediction markets</p>
-          <h1>iknow</h1>
-          <p>Create a YES/NO market from a Source, let agents check the rules, and settle outcomes with visible evidence.</p>
-          <div className="hero-actions">
-            <button type="button" onClick={onCreateMarket}>
-              Create from Source
-            </button>
-            <button className="secondary" type="button" onClick={onBrowseMarkets}>
-              Browse markets
-            </button>
+    <div className={`landing-page character-${characterState}`}>
+      <section className="landing-story-grid" aria-label="iknow landing story">
+        <aside className="landing-character-rail" aria-label="iknow character states">
+          <div className="landing-character-frame">
+            <img
+              className="landing-character-image"
+              data-state="smug"
+              src="/characters/landing/iknow-landing-smug-hd.png"
+              alt="Smug iknow character"
+            />
+            <img
+              className="landing-character-image"
+              data-state="focus"
+              src="/characters/landing/iknow-landing-focus-hd.png"
+              alt="Focused iknow character"
+            />
+            <img
+              className="landing-character-image"
+              data-state="surprised"
+              src="/characters/landing/iknow-landing-surprised-hd.png"
+              alt="Surprised iknow character"
+            />
           </div>
-        </div>
-        <div className="landing-mascot-stage" aria-hidden="true">
-          <MugMascot className="landing-mascot" />
-          <span>calls with receipts</span>
-        </div>
-      </section>
+        </aside>
 
-      {readbackStatus && <p className={isLoadingStatus(readbackStatus) ? "status-text" : "error-text"}>{readbackStatus}</p>}
-
-      <section className="landing-proof-strip" aria-label="iknow product loop">
-        <div>
-          <span>1</span>
-          <strong>Import</strong>
-          <p>Start from Source market metadata instead of a blank form.</p>
-        </div>
-        <div>
-          <span>2</span>
-          <strong>Review</strong>
-          <p>Agents score whether the rules can be resolved later.</p>
-        </div>
-        <div>
-          <span>3</span>
-          <strong>Settle</strong>
-          <p>Evidence packets explain the final Yes, No, or Invalid call.</p>
-        </div>
-      </section>
-
-      <section className="landing-market-band">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Live board</p>
-            <h2>{loadingMarkets && hasNoMarkets ? "Loading markets" : `${markets.length} markets, ${openMarkets} open`}</h2>
-          </div>
-          <button className="secondary" type="button" onClick={onBrowseMarkets}>
-            Open board
-          </button>
-        </div>
-        <div className="landing-market-grid">
-          {hasNoMarkets ? (
-            <MarketLoadingState isLoading={loadingMarkets} />
-          ) : featuredMarkets.map((market) => (
-            <article className="landing-market-card" key={market.id}>
-              <div>
-                <span className="status">{market.status}</span>
-                <h3>{market.question}</h3>
-                <p>Closes {formatDate(market.closeTime)}</p>
-              </div>
-              <div className="landing-price-row">
-                <span>YES {Math.round(market.yesPrice * 100)}¢</span>
-                <span>NO {Math.round(market.noPrice * 100)}¢</span>
-              </div>
-              <button className="secondary" type="button" onClick={() => onOpenMarket(market.id)}>
-                View market
+        <div className="landing-content-stack">
+          <section className="landing-story-screen" data-character-state="smug" aria-labelledby="landing-hero-title">
+            <p className="landing-eyebrow">Arc-native market factory</p>
+            <h1 id="landing-hero-title">iknow</h1>
+            <p className="landing-hero-line">Create the market. Price the belief. Prove the outcome.</p>
+            <p className="landing-story-copy">
+              Turn any clean claim into a fully collateralized YES/NO AMM. Seed it with USDC, trade from your wallet, and let agents prepare the receipts when the market closes.
+            </p>
+            <div className="landing-cta-row">
+              <button className="landing-button-link" type="button" onClick={onBrowseMarkets}>
+                Open app
               </button>
-            </article>
-          ))}
+              <a className="landing-button-link secondary" href="#github">
+                View repo
+              </a>
+            </div>
+            <div className="landing-pill-row" aria-label="Core product signals">
+              <span className="landing-pill">No vault</span>
+              <span className="landing-pill">Creator-seeded AMM</span>
+              <span className="landing-pill">Wallet USDC</span>
+              <span className="landing-pill">YES / NO / INVALID</span>
+            </div>
+            <div className="landing-motion-note">
+              The first screen is the smug one: iknow already knows the market needs liquidity, rules, and receipts.
+            </div>
+          </section>
+
+          <section className="landing-story-screen" data-character-state="focus" aria-labelledby="landing-mechanism-title">
+            <p className="landing-eyebrow">Before trading</p>
+            <h2 id="landing-mechanism-title">A vague take does not become a market. Nice try.</h2>
+            <p className="landing-story-copy">
+              The drafting agent turns a claim into a market spec: close time, source of truth, YES condition, NO condition, and INVALID edge cases. Then the creator posts capital.
+            </p>
+            <div className="landing-card-grid">
+              <article className="landing-card ink">
+                <span className="landing-mini-label">Complete-set solvency</span>
+                <h3>1 USDC backs 1 YES plus 1 NO.</h3>
+                <p>The AMM prices belief, but the collateral math stays boring on purpose.</p>
+                <div className="landing-complete-set" aria-label="USDC creates YES and NO">
+                  <span className="landing-token usdc">1 USDC</span>
+                  <span className="landing-plus">=</span>
+                  <span className="landing-set-output">
+                    <span className="landing-token yes">1 YES</span>
+                    <span className="landing-token no">1 NO</span>
+                  </span>
+                </div>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Creator capital</span>
+                <h3>Liquidity first. Opinions later.</h3>
+                <p>The creator seeds the AMM so the market is tradeable immediately. Other LPs can join when the market deserves depth.</p>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Market rules</span>
+                <h3>YES, NO, INVALID before launch.</h3>
+                <p>Each market has a payout condition, a losing condition, and an invalid path for broken or unjudgeable outcomes.</p>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Wallet flow</span>
+                <h3>No vault. No balance theater.</h3>
+                <p>Your wallet has USDC; iknow uses it. Sponsored gas can keep core actions from becoming a gas ritual.</p>
+              </article>
+            </div>
+          </section>
+
+          <section className="landing-story-screen" data-character-state="surprised" aria-labelledby="landing-resolution-title">
+            <p className="landing-eyebrow">Resolution</p>
+            <h2 id="landing-resolution-title">The answer is not a vibe. It is a packet.</h2>
+            <p className="landing-story-copy">
+              At close, agents collect sources, compare them to the market rules, and recommend YES, NO, or INVALID. AI recommends. Contracts and the authorized resolver flow decide.
+            </p>
+            <div className="landing-card-grid">
+              <article className="landing-card">
+                <span className="landing-mini-label">Evidence gathered</span>
+                <h3>Official sources, timestamps, facts.</h3>
+                <p>The packet shows the trail behind the call instead of asking users to trust a black box.</p>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Recommendation</span>
+                <h3>YES / NO / INVALID</h3>
+                <p>The agent produces a reasoned recommendation with confidence and invalid checks.</p>
+                <div className="landing-market-row">
+                  <span className="landing-price yes">YES</span>
+                  <span className="landing-price no">NO</span>
+                  <span className="landing-price">INVALID</span>
+                </div>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Trust model</span>
+                <h3>AI may recommend. Contracts decide.</h3>
+                <p>The market spec governs the result. Ambiguous markets go to review instead of forced confidence.</p>
+              </article>
+              <article className="landing-card">
+                <span className="landing-mini-label">Redemption</span>
+                <h3>Winning tokens redeem USDC.</h3>
+                <p>After final resolution, the winning side claims the collateral it was promised.</p>
+              </article>
+            </div>
+            <div className="landing-motion-note">
+              The third screen earns the surprised/amused mascot: receipts came in, the market has to respect them.
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section className="landing-final-screen" id="github" aria-labelledby="landing-final-title">
+        <h2 className="landing-final-title" id="landing-final-title">iknow</h2>
+        <p className="landing-final-copy">
+          Arc-native markets with wallet USDC, creator-seeded liquidity, and evidence packets. The contract address makes the factory real.
+        </p>
+        <div className="landing-repo-grid" aria-label="GitHub repository details">
+          <article className="landing-repo-card">
+            <span className="landing-mini-label">Factory contract</span>
+            <a
+              className="landing-contract-address"
+              href="https://testnet.arcscan.app/address/0x023290ce90BbB56160d847a3124B60743d213719"
+              target="_blank"
+              rel="noreferrer"
+            >
+              0x023290ce90BbB56160d847a3124B60743d213719
+            </a>
+            <p>Arc Testnet factory that creates and registers iknow markets.</p>
+          </article>
+          <article className="landing-repo-card">
+            <span className="landing-mini-label">GitHub</span>
+            <strong>Public repository</strong>
+            <p>Use the final project repo link here for judges, source review, and submission handoff.</p>
+            <a className="landing-repo-link" href="https://github.com/bucketshop69/iknow" target="_blank" rel="noreferrer">
+              github.com/bucketshop69/iknow
+            </a>
+          </article>
+          <article className="landing-repo-card app-cta">
+            <button className="landing-repo-link" type="button" onClick={onBrowseMarkets}>
+              Go to app
+            </button>
+          </article>
         </div>
       </section>
     </div>
@@ -2722,6 +2840,10 @@ function MugMascot({ className = "" }: { className?: string }) {
       <span className="create-mascot-smirk" />
     </div>
   );
+}
+
+function SmugAppIcon() {
+  return <span className="smug-app-icon" aria-hidden="true" />;
 }
 
 function shortMarketTitle(question: string) {

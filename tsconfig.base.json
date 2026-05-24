@@ -13,6 +13,7 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
+      "@iknow/abis": ["packages/abis/src/index.ts"],
       "@iknow/shared": ["packages/shared/src/index.ts"]
     },
     "resolveJsonModule": true,

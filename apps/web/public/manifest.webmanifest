@@ -4,13 +4,13 @@
   "description": "Arc-native prediction markets with agent-backed receipts.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f1ea",
-  "theme_color": "#1d1b18",
+  "background_color": "#1b1916",
+  "theme_color": "#1b1916",
   "icons": [
     {
-      "src": "/iknow-mascot.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/characters/avatars/iknow-smug-expression-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
