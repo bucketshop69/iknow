@@ -4,7 +4,7 @@
 
 The App MVP is functional-first. We should make the product understandable, usable, and reliable before spending serious time on visual polish.
 
-The functional plan lives in `docs/app-mvp-plan.md`.
+The product direction lives in `docs/vision.md`, and the local demo/deployment flow lives in `docs/local-chain.md`.
 
 For now, design work should support these goals:
 

@@ -158,7 +158,7 @@ If challenge state cannot be read, the decision must be `NEEDS_REVIEW`.
 
 For the MVP, autonomous resolver actions are local-only.
 
-The resolver wallet must be the `Resolver` actor from the local deployment artifact described in `docs/app-mvp-plan.md`. It is expected to have local ETH for gas and any required local permissions. The agent must treat this wallet as a development actor, not a production key.
+The resolver wallet must be the `Resolver` actor from the local deployment artifact described in `docs/local-chain.md`. It is expected to have local ETH for gas and any required local permissions. The agent must treat this wallet as a development actor, not a production key.
 
 No autonomous resolver policy in this document authorizes the use of a mainnet, testnet, multisig, custody, or user wallet. Non-local deployments require a separate production governance and key-management policy.
 
