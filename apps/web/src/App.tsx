@@ -1951,10 +1951,6 @@ function MarketActionPanel({
 
   return (
     <aside className="market-ticket">
-      <div className="ticket-head">
-        <span>Market actions</span>
-        <h2>Bet or fund market</h2>
-      </div>
       <div className="ticket-body">
         <div className="ticket-tabs" aria-label="Market action">
           <button
