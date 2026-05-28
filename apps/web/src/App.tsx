@@ -1932,6 +1932,10 @@ function MarketActionPanel({
   const canSendUserAction = !actionBlockReason && !pendingAction;
   const settlementBlockReason = !isWalletReady ? "Connect your wallet before claiming from Arc Testnet." : null;
   const canSendSettlementAction = !settlementBlockReason && !pendingAction;
+  const isBetActionStatus = ["Buy YES", "Buy NO", "Sell YES", "Sell NO"].includes(actionLabel ?? "");
+  const isFundActionStatus = ["Fund market", "Remove money"].includes(actionLabel ?? "");
+  const isSettlementActionStatus = actionLabel === "Claim winnings";
+  const isInlineTicketStatus = isBetActionStatus || isFundActionStatus || isSettlementActionStatus;
   const fundAmountLabel = `${liquidityAmount || "0"} USDC`;
   const removeSharesLabel = `${removeShares || "0"} funded shares`;
   const userHasCall = Boolean(userState && (BigInt(userState.yesBalanceRaw) > 0n || BigInt(userState.noBalanceRaw) > 0n));
@@ -2033,10 +2037,13 @@ function MarketActionPanel({
             </dl>
             {quoteStatus && <p className={isTradeQuoteError ? "error-text" : "status-text"}>{quoteStatus}</p>}
             <TicketActionProgress phase={actionPhase} label={actionLabel} />
-            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
             <button disabled={!canSendUserAction} onClick={() => runTrade(tradeAction)}>
               {tradeCtaLabel}
             </button>
+            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
+            {status && isBetActionStatus && (
+              <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>
+            )}
             <p className="helper">If you called it right, claim after receipts are posted and the result is in.</p>
           </div>
         ) : (
@@ -2093,7 +2100,6 @@ function MarketActionPanel({
               </div>
             </dl>
             <TicketActionProgress phase={actionPhase} label={actionLabel} />
-            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
             <button
               disabled={!canSendUserAction}
               onClick={() =>
@@ -2104,6 +2110,10 @@ function MarketActionPanel({
             >
               {fundMode === "add" ? "Fund market" : "Remove money"}
             </button>
+            {actionBlockReason && <p className="ticket-blocker">{actionBlockReason}</p>}
+            {status && isFundActionStatus && (
+              <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>
+            )}
             <p className="risk-note">
               This is not a fixed return. The amount you can withdraw can change as the market moves.
             </p>
@@ -2168,6 +2178,9 @@ function MarketActionPanel({
           >
             Claim winnings
           </button>
+          {status && isSettlementActionStatus && (
+            <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>
+          )}
         </div>
 
         <details className="ticket-resolution">
@@ -2280,7 +2293,9 @@ function MarketActionPanel({
           </div>
         </dl>
         </details>
-        {status && <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>}
+        {status && !isInlineTicketStatus && (
+          <p className={looksLikeErrorStatus(status) ? "error-text" : "status-text"}>{status}</p>
+        )}
       </div>
     </aside>
   );
