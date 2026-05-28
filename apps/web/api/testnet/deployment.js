@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export default async function handler(_req, res) {
   try {
-    const file = await readFile(path.join(process.cwd(), "api", "arc-testnet.json"), "utf8");
+    const file = await readFile(fileURLToPath(new URL("../arc-testnet.json", import.meta.url)), "utf8");
     res.statusCode = 200;
     res.setHeader("content-type", "application/json; charset=utf-8");
     res.setHeader("cache-control", "no-store");

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ONE_USDC = 1_000_000n;
 const MIN_CREATION_BOND = 5n * ONE_USDC;
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 }
 
 async function readArcDeployment() {
-  const file = await readFile(path.join(process.cwd(), "api", "arc-testnet.json"), "utf8");
+  const file = await readFile(fileURLToPath(new URL("./arc-testnet.json", import.meta.url)), "utf8");
   return JSON.parse(file);
 }
 
