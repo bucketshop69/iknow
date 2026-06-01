@@ -120,6 +120,8 @@ const themeStorageKey = "iknow-theme-v2";
 
 const isLoadingStatus = (status: string | null) => Boolean(status?.startsWith("Loading") || status?.startsWith("Refreshing"));
 
+type MarketViewMode = "cards" | "table";
+
 const characterAvatarPaths = [
   "/characters/avatars/iknow-avatar-01-smug.webp",
   "/characters/avatars/iknow-avatar-02-focused.webp",
@@ -980,6 +982,7 @@ function MarketsScreen({
   onOpenMarket: (marketId: string) => void;
 }) {
   const loadingMarkets = isLoadingStatus(readbackStatus);
+  const [viewMode, setViewMode] = useState<MarketViewMode>("cards");
 
   return (
     <>
@@ -988,40 +991,101 @@ function MarketsScreen({
           <p className="eyebrow">Markets</p>
           <h1>What do you know today?</h1>
         </div>
-        <span className="count-pill">{markets.length} markets</span>
+        <div className="market-view-actions" aria-label="Market view controls">
+          <span className="count-pill">{markets.length} markets</span>
+          <div className="view-toggle" role="group" aria-label="Market view">
+            <button
+              className={viewMode === "cards" ? "active" : ""}
+              type="button"
+              aria-label="Card view"
+              aria-pressed={viewMode === "cards"}
+              title="Card view"
+              onClick={() => setViewMode("cards")}
+            >
+              <span className="view-icon view-icon-grid" aria-hidden="true" />
+            </button>
+            <button
+              className={viewMode === "table" ? "active" : ""}
+              type="button"
+              aria-label="Table view"
+              aria-pressed={viewMode === "table"}
+              title="Table view"
+              onClick={() => setViewMode("table")}
+            >
+              <span className="view-icon view-icon-table" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
       </header>
       {readbackStatus && <p className={isLoadingStatus(readbackStatus) ? "status-text" : "error-text"}>{readbackStatus}</p>}
 
-      <section className="market-table" aria-label="Markets">
-        <div className="market-row table-head">
-          <span>Market</span>
-          <span>Status</span>
-          <span>YES</span>
-          <span>NO</span>
-          <span>Liquidity</span>
-        </div>
-        {markets.length === 0 ? (
-          <MarketLoadingState isLoading={loadingMarkets} />
-        ) : markets.map((market) => (
-          <article className="market-row" key={market.id}>
-            <div className="market-row-main">
-              {(market.imageUrl || market.sourceIdea?.imageUrl) && (
-                <img className="market-thumb" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
-              )}
-              <div>
-                <button className="market-title-button" type="button" onClick={() => onOpenMarket(market.id)}>
-                  {market.question}
-                </button>
-                <p>Closes {formatDate(market.closeTime)}</p>
+      {viewMode === "cards" ? (
+        <section className="market-card-grid" aria-label="Markets">
+          {markets.length === 0 ? (
+            <MarketLoadingState isLoading={loadingMarkets} />
+          ) : markets.map((market) => (
+            <article className="market-card" key={market.id}>
+              <button className="market-card-button" type="button" onClick={() => onOpenMarket(market.id)}>
+                <div className="market-card-top">
+                  {(market.imageUrl || market.sourceIdea?.imageUrl) && (
+                    <img className="market-thumb market-card-image" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
+                  )}
+                  <span className="status">{market.status}</span>
+                </div>
+                <div className="market-card-body">
+                  <h2>{market.question}</h2>
+                  <p>Closes {formatDate(market.closeTime)}</p>
+                </div>
+                <div className="market-card-metrics" aria-label="Market metrics">
+                  <span>
+                    <small>YES</small>
+                    <strong>{Math.round(market.yesPrice * 100)}¢</strong>
+                  </span>
+                  <span>
+                    <small>NO</small>
+                    <strong>{Math.round(market.noPrice * 100)}¢</strong>
+                  </span>
+                  <span>
+                    <small>LIQUIDITY</small>
+                    <strong>{market.liquidity}</strong>
+                  </span>
+                </div>
+              </button>
+            </article>
+          ))}
+        </section>
+      ) : (
+        <section className="market-table" aria-label="Markets">
+          <div className="market-row table-head">
+            <span>Market</span>
+            <span>Status</span>
+            <span>YES</span>
+            <span>NO</span>
+            <span>Liquidity</span>
+          </div>
+          {markets.length === 0 ? (
+            <MarketLoadingState isLoading={loadingMarkets} />
+          ) : markets.map((market) => (
+            <article className="market-row" key={market.id}>
+              <div className="market-row-main">
+                {(market.imageUrl || market.sourceIdea?.imageUrl) && (
+                  <img className="market-thumb" src={market.imageUrl ?? market.sourceIdea?.imageUrl} alt="" />
+                )}
+                <div>
+                  <button className="market-title-button" type="button" onClick={() => onOpenMarket(market.id)}>
+                    {market.question}
+                  </button>
+                  <p>Closes {formatDate(market.closeTime)}</p>
+                </div>
               </div>
-            </div>
-            <span className="status">{market.status}</span>
-            <strong>{Math.round(market.yesPrice * 100)}¢</strong>
-            <strong>{Math.round(market.noPrice * 100)}¢</strong>
-            <span>{market.liquidity}</span>
-          </article>
-        ))}
-      </section>
+              <span className="status">{market.status}</span>
+              <strong>{Math.round(market.yesPrice * 100)}¢</strong>
+              <strong>{Math.round(market.noPrice * 100)}¢</strong>
+              <span>{market.liquidity}</span>
+            </article>
+          ))}
+        </section>
+      )}
     </>
   );
 }

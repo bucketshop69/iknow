@@ -779,6 +779,62 @@ textarea {
   max-width: 980px;
 }
 
+.market-view-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.view-toggle {
+  border: 1px solid var(--shell-line);
+  border-radius: 999px;
+  background: var(--shell-nav-bg);
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.view-toggle button {
+  align-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--shell-muted);
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  width: 32px;
+}
+
+.view-toggle button.active {
+  background: var(--shell-ink);
+  color: var(--shell-nav-active-text);
+}
+
+.view-icon {
+  display: block;
+  height: 15px;
+  position: relative;
+  width: 15px;
+}
+
+.view-icon-grid {
+  background:
+    linear-gradient(currentColor 0 0) 0 0 / 6px 6px no-repeat,
+    linear-gradient(currentColor 0 0) 9px 0 / 6px 6px no-repeat,
+    linear-gradient(currentColor 0 0) 0 9px / 6px 6px no-repeat,
+    linear-gradient(currentColor 0 0) 9px 9px / 6px 6px no-repeat;
+}
+
+.view-icon-table {
+  background:
+    linear-gradient(currentColor 0 0) 0 1px / 15px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 0 6px / 15px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 0 11px / 15px 3px no-repeat;
+}
+
 .market-detail-title,
 .market-row-main {
   align-items: center;
@@ -864,6 +920,103 @@ p {
 .market-table {
   display: grid;
   gap: 8px;
+}
+
+.market-card-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.market-card-grid .market-loading-state {
+  grid-column: 1 / -1;
+}
+
+.market-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.market-card-button {
+  background: transparent;
+  color: var(--shell-ink);
+  display: grid;
+  gap: 18px;
+  height: 100%;
+  min-height: 260px;
+  padding: 18px;
+  text-align: left;
+  width: 100%;
+}
+
+.market-card-button:hover h2,
+.market-card-button:focus-visible h2 {
+  color: var(--shell-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.market-card-top {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.market-card-image {
+  height: 72px;
+  width: 96px;
+}
+
+.market-card-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.market-card-body h2 {
+  color: var(--shell-ink);
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.market-card-body p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.market-card-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: auto;
+}
+
+.market-card-metrics span {
+  border: 1px solid var(--shell-line);
+  border-radius: 6px;
+  background: var(--shell-card-soft);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.market-card-metrics small {
+  color: var(--shell-muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.market-card-metrics strong {
+  color: var(--shell-ink);
+  font-size: 16px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .market-row {
@@ -3173,6 +3326,7 @@ dd {
   .detail-grid,
   .landing-card-grid,
   .landing-repo-grid,
+  .market-card-grid,
   .market-detail-workspace,
   .money-panel,
   .portfolio-hero,
@@ -3336,6 +3490,20 @@ dd {
   .create-state-track,
   .create-suggestion-list {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .market-view-actions {
+    align-items: start;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .market-card-button {
+    min-height: 232px;
+  }
+
+  .market-card-metrics {
     grid-template-columns: 1fr;
   }
 
