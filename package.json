@@ -15,7 +15,8 @@
     "chain:anvil": "scripts/anvil-local.sh",
     "chain:deploy": "scripts/deploy-local.sh",
     "chain:deploy:arc": "scripts/deploy-arc-testnet.sh",
-    "chain:create-market:arc": "scripts/create-arc-testnet-market.sh"
+    "chain:create-market:arc": "scripts/create-arc-testnet-market.sh",
+    "chain:create-fifa-markets:arc": "scripts/create-arc-testnet-fifa-markets.sh"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

@@ -27,6 +27,195 @@
   },
   "markets": [
     {
+      "id": "will-spain-win-the-2026-fifa-world-cup-bd6608",
+      "address": "0xa1Fc3102f03385D6B00C82dD9817b706906FaDd4",
+      "specHash": "0xd5c5014465c4f9a93a22edc3c002408cce2b0948b23eca9c1891e4828af704b5",
+      "metadataURI": "urn:iknow:market:0xd5c5014465c4f9a93a22edc3c002408cce2b0948b23eca9c1891e4828af704b5",
+      "question": "Will Spain win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares Spain the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if Spain is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-spain-win-the-2026-fifa-world-cup-963-GGS_qu77mAwD.jpg",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558934",
+        "url": "https://polymarket.com/market/will-spain-win-the-2026-fifa-world-cup-963",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-spain-win-the-2026-fifa-world-cup-963-GGS_qu77mAwD.jpg",
+        "question": "Will Spain win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "10426915141820074339529002621202066909740921057829868941810272824756373177619",
+      "noTokenId": "27288883325200225888164995414280685588095548521510922767335577686378024845386"
+    },
+    {
+      "id": "will-france-win-the-2026-fifa-world-cup-9219ae",
+      "address": "0x0d9971372fE71Aa963FF17c6C4C2c840ddad92Ab",
+      "specHash": "0xbb7ef6cfa221deb54aaac7d2769627ce646c7594741d43a98f5b83fbcf51b9da",
+      "metadataURI": "urn:iknow:market:0xbb7ef6cfa221deb54aaac7d2769627ce646c7594741d43a98f5b83fbcf51b9da",
+      "question": "Will France win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares France the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if France is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-france-win-the-2026-fifa-world-cup-924-HpDpNpZGzhE6.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558936",
+        "url": "https://polymarket.com/market/will-france-win-the-2026-fifa-world-cup-924",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-france-win-the-2026-fifa-world-cup-924-HpDpNpZGzhE6.png",
+        "question": "Will France win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "10475872927723821838476040364861040197155231617168987941635475181453926131563",
+      "noTokenId": "44340759193388046243317840630534427035103827427027068545363474857203941190066"
+    },
+    {
+      "id": "will-brazil-win-the-2026-fifa-world-cup-3c8f9f",
+      "address": "0x9CB79eB6048244eC822476cE1cED2b2c9457A39f",
+      "specHash": "0x7b45cfdad4eaa5fc9164dc6843d264abe85d3c5c0a20ca7f4313f28163ab40c3",
+      "metadataURI": "urn:iknow:market:0x7b45cfdad4eaa5fc9164dc6843d264abe85d3c5c0a20ca7f4313f28163ab40c3",
+      "question": "Will Brazil win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares Brazil the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if Brazil is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-brazil-win-the-2026-fifa-world-cup-183-mWG-xaHVZtUa.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558937",
+        "url": "https://polymarket.com/market/will-brazil-win-the-2026-fifa-world-cup-183",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-brazil-win-the-2026-fifa-world-cup-183-mWG-xaHVZtUa.png",
+        "question": "Will Brazil win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "101610782068224704229156152986830881593282285492972566100626956717539637287674",
+      "noTokenId": "97492093539274454808326845976291898717588644171580787639474480953660081145936"
+    },
+    {
+      "id": "will-germany-win-the-2026-fifa-world-cup-8ab536",
+      "address": "0xD974A43FddD2B3f9688432DB4B3C7EeDE4811320",
+      "specHash": "0xac09e6b4a138397e8ebf51dceffe9e143e6d83191ba99f333fa163ceca589a62",
+      "metadataURI": "urn:iknow:market:0xac09e6b4a138397e8ebf51dceffe9e143e6d83191ba99f333fa163ceca589a62",
+      "question": "Will Germany win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares Germany the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if Germany is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-germany-win-the-2026-fifa-world-cup-467-bMMLcP0kbRWp.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558939",
+        "url": "https://polymarket.com/market/will-germany-win-the-2026-fifa-world-cup-467",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-germany-win-the-2026-fifa-world-cup-467-bMMLcP0kbRWp.png",
+        "question": "Will Germany win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "53543342882411218141484685399276747967476261419858069392399598534994375512491",
+      "noTokenId": "102684371945459019092240480634001576659768250786832793055385551772790173458240"
+    },
+    {
+      "id": "will-portugal-win-the-2026-fifa-world-cup-011778",
+      "address": "0xC7a57824fbe5CEB0450Ca7f775F4AB4667260195",
+      "specHash": "0x5e1dde39af4af6a7175647de0ee2337141d70d156b859cff0107c06a223a5962",
+      "metadataURI": "urn:iknow:market:0x5e1dde39af4af6a7175647de0ee2337141d70d156b859cff0107c06a223a5962",
+      "question": "Will Portugal win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares Portugal the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if Portugal is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-portugal-win-the-2026-fifa-world-cup-912-hBSLTDz-fryP.jpg",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558940",
+        "url": "https://polymarket.com/market/will-portugal-win-the-2026-fifa-world-cup-912",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-portugal-win-the-2026-fifa-world-cup-912-hBSLTDz-fryP.jpg",
+        "question": "Will Portugal win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "105527620324617256477521121508607076002011136733709223882178443479282483136965",
+      "noTokenId": "44166093803491011281662522698939143270348645178103750441360911116974322274507"
+    },
+    {
+      "id": "will-argentina-win-the-2026-fifa-world-cup-9b220c",
+      "address": "0x008db16855aEacb2474Fbfd614Ae72964db4fB8D",
+      "specHash": "0x36f2ae4493c60f1d73439f5366fa1bafc05f6460cb7cfbe11fcd1869e68d147e",
+      "metadataURI": "urn:iknow:market:0x36f2ae4493c60f1d73439f5366fa1bafc05f6460cb7cfbe11fcd1869e68d147e",
+      "question": "Will Argentina win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares Argentina the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if Argentina is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-argentina-win-the-2026-fifa-world-cup-245-fNAFwGoMJCpr.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558938",
+        "url": "https://polymarket.com/market/will-argentina-win-the-2026-fifa-world-cup-245",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-argentina-win-the-2026-fifa-world-cup-245-fNAFwGoMJCpr.png",
+        "question": "Will Argentina win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "17989230575025254111970978000647773050870733033004158021596063265709810384396",
+      "noTokenId": "6774579341668356739438706557160508102244840728716167316757275228437799339806"
+    },
+    {
+      "id": "will-england-win-the-2026-fifa-world-cup-33fc68",
+      "address": "0x898dF0Dec33cEcAF04CCAc3c6EF25B9147769B4D",
+      "specHash": "0x5e870eebd3106630a802cc017e46a82d8306a5c6e65e761abad96bfaac1ba241",
+      "metadataURI": "urn:iknow:market:0x5e870eebd3106630a802cc017e46a82d8306a5c6e65e761abad96bfaac1ba241",
+      "question": "Will England win the 2026 FIFA World Cup?",
+      "closeTime": 1784505600,
+      "resolutionSource": "Official information from FIFA for the 2026 FIFA World Cup. YES resolves if FIFA declares England the winner of the 2026 FIFA World Cup. NO resolves if another national team wins, or if England is eliminated or otherwise cannot win under FIFA rules. If official FIFA information is unavailable, use consensus reporting from major credible sports outlets.",
+      "invalidConditions": [
+        "The result cannot be objectively checked from FIFA official information or credible sports reporting.",
+        "If the 2026 FIFA World Cup is permanently canceled or has not been completed by October 13, 2026 at 11:59 PM UTC, resolve to INVALID.",
+        "If FIFA changes tournament rules in a way that makes this winner market ambiguous or non-binary, resolve to INVALID."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-england-win-the-2026-fifa-world-cup-937-_1d1dBqIjAJF.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "558935",
+        "url": "https://polymarket.com/market/will-england-win-the-2026-fifa-world-cup-937",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-england-win-the-2026-fifa-world-cup-937-_1d1dBqIjAJF.png",
+        "question": "Will England win the 2026 FIFA World Cup?",
+        "closeTime": "2026-07-20T00:00:00.000Z"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "76505753710448953918525013867132540644564168213020878647691700652974872081013",
+      "noTokenId": "45274827792889508687349637573744375129626188250261302247097154826591001611231"
+    },
+    {
       "id": "will-uzbekistan-win-the-2026-fifa-world-cup-b7e392",
       "address": "0x8e3b8a00d68e6ddaE363B75309861af76B168293",
       "specHash": "0x4da37c2c13a9cc59a98adc2555fe09f02bc1bc5a6ddb59507fe6955759bb7c36",
@@ -214,6 +403,165 @@
       "initialLiquidity": "10000000",
       "yesTokenId": "18376749345176789867797970031369537584240103808052084669271388105753685784374",
       "noTokenId": "64179059127808024785581752759509094222488229691919899268895195478329819653008"
+    },
+    {
+      "id": "will-the-fed-decrease-interest-rates-by-25-bps-after-the-june-2026-meeting-adf101",
+      "address": "0x002b808276f7A82B2cCeeB6b7847b48c1877fEae",
+      "specHash": "0x7425c0be3c96a34fbe6375166a968558b76afee0a61e33a22561af2ac95b7561",
+      "metadataURI": "urn:iknow:market:0x7425c0be3c96a34fbe6375166a968558b76afee0a61e33a22561af2ac95b7561",
+      "question": "Will the Fed decrease interest rates by 25 bps after the June 2026 meeting?",
+      "closeTime": 1781654400,
+      "resolutionSource": "The official FOMC statement released following the June 16-17, 2026 Federal Open Market Committee meeting, published on https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm. The target federal funds rate upper bound change is compared to the level established at the prior FOMC meeting. A change of 25 bps (or 12.5 bps rounded up) constitutes a YES. If no statement is released by the end of the next scheduled FOMC meeting, resolve to 'No change'. YES path: Future resolver checks the FOMC statement released after the June 16-17, 2026 meeting. Verifies the upper bound of the target federal funds rate decreased by 25 basis points compared to prior meeting level. Per rounding rules, a 12.5 bps cut also qualifies as YES. NO path: Future resolver checks FOMC statement. If target federal funds rate upper bound remained unchanged, increased, or changed by any amount other than 25 bps (e.g., 50 bps cut or 25 bps increase), resolve NO. Evidence plan: FOMC statement from June 16-17, 2026 meeting (https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm) Target federal funds rate data from https://www.federalreserve.gov/monetarypolicy/openmarket.htm Prior FOMC statement/meeting record to establish baseline rate level Download and archive the FOMC statement from federalreserve.gov/monetarypolicy/fomccalendars.htm for June 2026 meeting",
+      "invalidConditions": [
+        "The result cannot be objectively checked from the market details.",
+        "The underlying event is cancelled, materially changed, or has no clear final result.",
+        "The FOMC meeting scheduled for June 16-17, 2026 is cancelled or the date is materially changed without an alternative official statement",
+        "No FOMC statement is released by the resolution deadline and no fallback data is available from the Federal Reserve website",
+        "The result cannot be objectively verified using official Federal Reserve sources",
+        "The result cannot be objectively verified from the official FOMC statement and Federal Reserve rate data.",
+        "The underlying FOMC meeting is cancelled without an official policy decision.",
+        "The Federal Reserve fundamentally changes how it communicates rate decisions, making basis point changes uninterpretable."
+      ],
+      "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/jerome+powell+glasses1.png",
+      "sourceIdea": {
+        "provider": "polymarket",
+        "externalId": "906973",
+        "url": "https://polymarket.com/market/will-the-fed-decrease-interest-rates-by-25-bps-after-the-june-2026-meeting",
+        "imageUrl": "https://polymarket-upload.s3.us-east-2.amazonaws.com/jerome+powell+glasses1.png",
+        "question": "Will the Fed decrease interest rates by 25 bps after the June 2026 meeting?",
+        "closeTime": "2026-06-17T00:00:00.000Z"
+      },
+      "importReview": {
+        "status": "ready",
+        "resolverMode": "autonomous",
+        "resolverTemplate": "general-agent",
+        "score": 8.2,
+        "blockers": [],
+        "warnings": [
+          "Question asks specifically about 25 bps decrease but description includes rounding logic that may include 12.5 bps as 25 bps",
+          "Binary YES/NO question but description mentions 'brackets' creating ambiguity about what happens with 50 bps or other changes",
+          "Resolution logic not fully explicit for scenarios beyond exactly 25 bps cut",
+          "Minor ambiguity: question asks 'decrease by 25 bps' but does not explicitly define YES outcome if rate changes by other amounts (e.g., 50 bps cut resolves NO)",
+          "Meeting timing: if statement released after market close but before resolution window, may need manual timing adjustment",
+          "Rounding interpretation: 12.5 bps treated as 25 bps per rules, but some may interpret this as unclear",
+          "Slight ambiguity if FOMC uses non-standard increments not covered by the rounding rule",
+          "Temporal edge case if statement is released very close to market close time",
+          "Pre-meeting rate level must be established clearly - agent needs to check the rate at end of prior FOMC meeting or last known level",
+          "Question emphasizes 'decrease' - an increase of 25 bps is unambiguously NO but could cause confusion",
+          "FOMC sometimes uses rate cuts in increments other than 25 bps (e.g., emergency cuts), agent must correctly apply rounding rule",
+          "Market may resolve as soon as statement is issued, before official confirmation on openmarket.htm",
+          "Minor ambiguity in rounding: 12.5 bps is treated as 25 bps, but exact 25 bps vs 37.5 bps interpretation",
+          "The question asks specifically for 'decrease' - a 25 bps increase should correctly resolve to No",
+          "Timezone handling for meeting dates and statement release",
+          "Ambiguity: question asks 'decrease by 25 bps' but description allows 12.5 bps to count as 25 bps",
+          "Ambiguity: should a 50 bps decrease count as YES or NO?",
+          "Binary question but description mentions 'brackets' suggesting multiple outcome categories",
+          "Close date is June 2026 - far future; policy/structure may change"
+        ],
+        "rewrittenResolutionSource": "The official FOMC statement released following the June 16-17, 2026 Federal Open Market Committee meeting, published on https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm. The target federal funds rate upper bound change is compared to the level established at the prior FOMC meeting. A change of 25 bps (or 12.5 bps rounded up) constitutes a YES. If no statement is released by the end of the next scheduled FOMC meeting, resolve to 'No change'. YES path: Future resolver checks the FOMC statement released after the June 16-17, 2026 meeting. Verifies the upper bound of the target federal funds rate decreased by 25 basis points compared to prior meeting level. Per rounding rules, a 12.5 bps cut also qualifies as YES. NO path: Future resolver checks FOMC statement. If target federal funds rate upper bound remained unchanged, increased, or changed by any amount other than 25 bps (e.g., 50 bps cut or 25 bps increase), resolve NO. Evidence plan: FOMC statement from June 16-17, 2026 meeting (https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm) Target federal funds rate data from https://www.federalreserve.gov/monetarypolicy/openmarket.htm Prior FOMC statement/meeting record to establish baseline rate level Download and archive the FOMC statement from federalreserve.gov/monetarypolicy/fomccalendars.htm for June 2026 meeting",
+        "rewrittenInvalidConditions": [
+          "The result cannot be objectively checked from the market details.",
+          "The underlying event is cancelled, materially changed, or has no clear final result.",
+          "The FOMC meeting scheduled for June 16-17, 2026 is cancelled or the date is materially changed without an alternative official statement",
+          "No FOMC statement is released by the resolution deadline and no fallback data is available from the Federal Reserve website",
+          "The result cannot be objectively verified using official Federal Reserve sources",
+          "The result cannot be objectively verified from the official FOMC statement and Federal Reserve rate data.",
+          "The underlying FOMC meeting is cancelled without an official policy decision.",
+          "The Federal Reserve fundamentally changes how it communicates rate decisions, making basis point changes uninterpretable."
+        ],
+        "evidencePlan": [
+          "FOMC statement from June 16-17, 2026 meeting (https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm)",
+          "Target federal funds rate data from https://www.federalreserve.gov/monetarypolicy/openmarket.htm",
+          "Prior FOMC statement/meeting record to establish baseline rate level",
+          "Download and archive the FOMC statement from federalreserve.gov/monetarypolicy/fomccalendars.htm for June 2026 meeting",
+          "Access the target federal funds rate data from federalreserve.gov/monetarypolicy/openmarket.htm",
+          "Compare the rate level before and after the June 2026 meeting",
+          "Verify the basis point change matches the expected resolution criteria",
+          "Verify June 16-17, 2026 FOMC meeting occurred via https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+        ],
+        "requiredCapabilities": [
+          "read_public_url",
+          "financial_data_federal_reserve",
+          "Access and parse official Federal Reserve websites (fomccalendars.htm, openmarket.htm)",
+          "Understand FOMC statements and rate terminology",
+          "Interpret target federal funds rate changes in basis points",
+          "Access and read official Federal Reserve websites (fomccalendars, openmarket)",
+          "Interpret FOMC statements to identify target federal funds rate changes",
+          "Apply 25 bps rounding rules correctly",
+          "Distinguish between rate decreases vs. increases vs. no change",
+          "Access and read official Federal Reserve website pages",
+          "Understand FOMC meeting statements and rate decisions",
+          "Compare numerical values (rate levels) between two time periods",
+          "Access and parse Federal Reserve official documents",
+          "Understand FOMC statements and monetary policy terminology",
+          "Verify target federal funds rate upper bound changes"
+        ],
+        "missingCapabilities": [],
+        "reviewerReports": [
+          {
+            "role": "rule-parser",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Clear official resolution source (Federal Reserve)",
+              "Specific, scheduled event (FOMC June 16-17, 2026)",
+              "Objective measurement criteria (bps change in target rate)",
+              "Well-documented edge cases and rounding rules",
+              "Publicly verifiable evidence from official government source"
+            ]
+          },
+          {
+            "role": "evidence-source",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Clear, verifiable resolution source via official FOMC statements",
+              "FOMC decisions are public record with no ambiguity",
+              "Event is scheduled and will occur regardless of outcome",
+              "Specific rounding rules eliminate edge case ambiguity",
+              "Publicly accessible evidence via Federal Reserve website"
+            ]
+          },
+          {
+            "role": "tooling",
+            "score": 8,
+            "verdict": "pass",
+            "reasons": [
+              "Clear official resolution sources (FOMC statement, Fed website)",
+              "Well-defined numerical threshold (25 bps) with rounding rule",
+              "Specific meeting date from official Fed calendar",
+              "Fallback rule defined for missing statement",
+              "Minor ambiguity: question asks about 'decrease' but what constitutes NO needs careful framing (increase, different magnitude)"
+            ]
+          },
+          {
+            "role": "adversarial",
+            "score": 9,
+            "verdict": "pass",
+            "reasons": [
+              "Well-defined event with clear date and outcome",
+              "Official government resolution source with public documentation",
+              "Objective measurement (basis points change in target federal funds rate)",
+              "Fallback resolution rule defined (no statement → No change)"
+            ]
+          },
+          {
+            "role": "policy",
+            "score": 6,
+            "verdict": "warning",
+            "reasons": [
+              "Question asks specifically about 25 bps decrease but description includes rounding logic that may include 12.5 bps as 25 bps",
+              "Binary YES/NO question but description mentions 'brackets' creating ambiguity about what happens with 50 bps or other changes",
+              "Resolution logic not fully explicit for scenarios beyond exactly 25 bps cut"
+            ]
+          }
+        ],
+        "reviewPolicyVersion": "market-import-review-llm-v1"
+      },
+      "creationBond": "5000000",
+      "initialLiquidity": "10000000",
+      "yesTokenId": "41646371148827879785339069830470788050833580209386933981593804749488462217406",
+      "noTokenId": "109592187116673108282130541664015614365732907063378451817848117177209353158734"
     },
     {
       "id": "arc-smoke-test",
